@@ -9,10 +9,12 @@
   --grid:        #2c2c2a;
   --baseline:    #383835;
   --border:      rgba(255,255,255,0.10);
-  --series-1:    #3987e5;   /* CH1 blue  */
-  --series-2:    #199e70;   /* CH2 aqua  */
-  --series-3:    #c98500;   /* CH3 yellow */
-  --series-4:    #008300;   /* CH4 green */
+  /* 채널 색상 (사용자 지정: CH1 노랑 / CH2 초록 / CH3 파랑 / CH4 빨강,
+     validate_palette.js 다크 서피스 검증 통과 — 인접쌍 CVD 는 직접 라벨로 보완) */
+  --series-1:    #c98500;   /* CH1 yellow */
+  --series-2:    #008300;   /* CH2 green  */
+  --series-3:    #3987e5;   /* CH3 blue   */
+  --series-4:    #e66767;   /* CH4 red    */
   --good:        #0ca30c;
   --warning:     #fab219;
   --critical:    #d03b3b;
@@ -136,6 +138,42 @@ main {
 .console .pass { color: var(--good); }
 .console .fail { color: var(--critical); }
 .console .warn { color: var(--warning); }
+
+/* 버튼/폼 (제어 패널·업데이트) */
+.btn {
+  background: #262624; color: var(--ink-2);
+  border: 1px solid var(--border); border-radius: 7px;
+  padding: 5px 12px; font: inherit; font-size: 13px; cursor: pointer;
+}
+.btn:hover { border-color: var(--muted); color: var(--ink); }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn-primary { border-color: var(--series-3); color: var(--ink); }
+.btn-danger { border-color: var(--critical); color: var(--critical); font-weight: 700; }
+.btn-danger:hover { background: rgba(208,59,59,0.18); color: var(--ink); }
+
+.hv-switch { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); font-size: 13px; }
+.hv-switch input { accent-color: var(--good); width: 16px; height: 16px; }
+
+.ctl-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ctl-table th { color: var(--muted); font-weight: 600; text-align: left; padding: 2px 6px; }
+.ctl-table td { padding: 3px 6px; }
+.ctl-table input[type="number"], .ctl-table select {
+  width: 100%; box-sizing: border-box;
+  background: #111110; color: var(--ink);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 4px 6px; font: inherit; font-size: 13px;
+}
+.ctl-table input[type="checkbox"] { width: 15px; height: 15px; }
+.ctl-ch { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); font-weight: 600; white-space: nowrap; }
+.ctl-ch .sw { width: 9px; height: 9px; border-radius: 2px; }
+.ctl-actions { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+
+/* LCD / 펌웨어 카드 */
+.lcd-wrap { position: relative; min-height: 60px; }
+#lcd-img { width: 100%; border-radius: 8px; border: 1px solid var(--border); display: block; }
+.empty-inline { color: var(--muted); padding: 14px 4px; }
+.fw-info { font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
+.fw-info b { color: var(--ink); }
 
 /* 타임라인 */
 .timeline { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; }

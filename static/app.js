@@ -1,4 +1,4 @@
-// DICE 벤치 대시보드 프론트엔드 — WS delta 수신 + 캔버스 스트립 차트.
+// DICE 벤치 대시보드 프론트엔드 — WS delta 수신 + 캔버스 스트립 차트 + 제어/업데이트.
 "use strict";
 
 const SERIES = [
@@ -15,6 +15,7 @@ const MAX_TIMELINE = 200;
 const statusPts = [];           // {ts, meas[4], hv, strm, run, alarm}
 let lastStatus = null;
 let serverOffset = 0;           // server now - client now (표시 시각 보정)
+let lastLcdTs = 0;
 
 function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 function fmtTime(ts) {
@@ -29,6 +30,15 @@ function fmtUA(v) {
 function fmtUAText(v) {
   return Math.abs(v) >= 1000 ? (v / 1000).toFixed(2) + " mA" : Math.round(v) + " µA";
 }
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  let data = {};
+  try { data = await r.json(); } catch (e) { /* 비 JSON 응답 */ }
+  return { ok: r.ok && data.ok !== false, ...data };
+}
 
 // ---- 범례 ----
 const legendEl = document.getElementById("legend");
@@ -36,7 +46,7 @@ for (const s of SERIES) {
   const it = document.createElement("span");
   it.className = "item";
   it.innerHTML = `<span class="sw" style="background:${s.color}"></span>${s.name}`;
-  if (s.key === 0) it.title = "CH1 측정 경로 고장 — 펌웨어에서 0 고정";
+  if (s.key === 0) it.title = "CH1 측정 경로 고장 — 펌웨어에서 0 고정 (출력은 정상)";
   legendEl.appendChild(it);
 }
 
@@ -67,6 +77,8 @@ function renderBadges(badges, fwInfo) {
   setBadge("b-dice", d.state,
     d.port ? d.port + (d.state === "busy" ? " 점유됨" : d.state === "open" ? "" : " 끊김") : "없음",
     d.detail);
+  const l = badges.lcd;
+  setBadge("b-lcd", l.state, l.state === "connected" ? l.addr : "미연결", l.detail);
   setBadge("b-fw", fwInfo ? "connected" : "unknown",
     fwInfo ? "v" + fwInfo.fw + " (proto " + fwInfo.proto + ")" : "—");
 }
@@ -89,6 +101,9 @@ function renderTiles() {
   run.className = "chip" + (lastStatus.run ? " on" : "");
   alarm.textContent = lastStatus.alarm ? "ALARM 0x" + lastStatus.alarm.toString(16).toUpperCase() : "ALARM";
   alarm.className = "chip" + (lastStatus.alarm ? " alarm-on" : "");
+  // HV 토글은 실제 상태를 따라감 (사용자가 만지는 중이 아닐 때)
+  const hvToggle = document.getElementById("hv-toggle");
+  if (document.activeElement !== hvToggle) hvToggle.checked = !!lastStatus.hv;
 }
 
 // ---- 콘솔 ----
@@ -261,14 +276,139 @@ function drawChart() {
   }
 }
 
-canvas.addEventListener("mousemove", e => {
-  hoverX = e.offsetX;
-});
+canvas.addEventListener("mousemove", e => { hoverX = e.offsetX; });
 canvas.addEventListener("mouseleave", () => { hoverX = null; tooltip.hidden = true; });
 
 // 데이터가 없어도 축이 흐르도록 5 Hz 재그리기
 setInterval(drawChart, 200);
 window.addEventListener("resize", drawChart);
+
+// ---- 출력 제어 패널 ----
+const WAVES = [[0, "사인"], [1, "구형"], [2, "톱니"], [3, "펄스"], [4, "임의(SRAM)"]];
+const ctlRows = document.getElementById("ctl-rows");
+for (const s of SERIES) {
+  const tr = document.createElement("tr");
+  tr.innerHTML =
+    `<td><label class="ctl-ch"><input type="checkbox" id="en-${s.key}" checked>` +
+    `<span class="sw" style="background:${s.color}"></span>${s.name}</label></td>` +
+    `<td><select id="wv-${s.key}">` +
+    WAVES.map(([v, n]) => `<option value="${v}">${n}</option>`).join("") +
+    `</select></td>` +
+    `<td><input type="number" id="fq-${s.key}" value="1000" min="1" max="200000" step="any"></td>` +
+    `<td><input type="number" id="am-${s.key}" value="5" min="0" max="62" step="any"></td>` +
+    `<td><input type="number" id="ph-${s.key}" value="0" min="0" max="359.99" step="any"></td>`;
+  ctlRows.appendChild(tr);
+}
+const ctlMsg = document.getElementById("ctl-msg");
+function say(el, text, isErr) {
+  el.textContent = text;
+  el.style.color = isErr ? cssVar("--critical") : cssVar("--muted")
+  if (text) setTimeout(() => { if (el.textContent === text) el.textContent = ""; }, 6000);
+}
+
+document.getElementById("hv-toggle").addEventListener("change", async e => {
+  const r = await api("/api/cmd", { action: "hv", on: e.target.checked });
+  if (!r.ok) say(ctlMsg, r.error || "HV 명령 실패", true);
+});
+document.getElementById("btn-estop").addEventListener("click", async () => {
+  const r = await api("/api/cmd", { action: "estop" });
+  say(ctlMsg, r.ok ? "ESTOP 전송됨" : (r.error || "ESTOP 실패"), !r.ok);
+});
+document.getElementById("btn-stop").addEventListener("click", async () => {
+  const r = await api("/api/cmd", { action: "stop", mask: 0x0F });
+  say(ctlMsg, r.ok ? "전체 정지 전송됨" : (r.error || "정지 실패"), !r.ok);
+});
+document.getElementById("btn-apply").addEventListener("click", async () => {
+  let mask = 0;
+  for (const s of SERIES) {
+    if (!document.getElementById(`en-${s.key}`).checked) continue;
+    mask |= 1 << s.key;
+    const r = await api("/api/cmd", {
+      action: "waveform", ch: s.key + 1,
+      type: +document.getElementById(`wv-${s.key}`).value,
+      freq_hz: +document.getElementById(`fq-${s.key}`).value,
+      amp_ma: +document.getElementById(`am-${s.key}`).value,
+      phase_deg: +document.getElementById(`ph-${s.key}`).value,
+    });
+    if (!r.ok) { say(ctlMsg, `${s.name} 설정 실패: ${r.error || ""}`, true); return; }
+  }
+  if (!mask) { say(ctlMsg, "켤 채널이 없습니다 (체크박스 확인)", true); return; }
+  const r = await api("/api/cmd", { action: "start", mask });
+  say(ctlMsg, r.ok ? "적용 + 시작 전송됨" : (r.error || "시작 실패"), !r.ok);
+});
+
+// ---- LCD 스크린샷 ----
+function refreshLcd(badges, lcdTs) {
+  const img = document.getElementById("lcd-img");
+  const empty = document.getElementById("lcd-empty");
+  const info = document.getElementById("lcd-info");
+  if (badges.lcd.state === "connected" && lcdTs > 0) {
+    if (lcdTs !== lastLcdTs) {
+      lastLcdTs = lcdTs;
+      img.src = "/api/lcd/screen.png?t=" + lcdTs;
+    }
+    img.hidden = false; empty.hidden = true;
+    info.textContent = "(" + fmtTime(lcdTs) + " 캡처)";
+  } else {
+    img.hidden = true; empty.hidden = false;
+    info.textContent = "";
+  }
+}
+
+// ---- 펌웨어 업데이트 (dice-ota) ----
+let fwRelease = null;
+const fwInfoEl = document.getElementById("fw-info");
+const fwApplyBtn = document.getElementById("btn-fw-apply");
+const fwMsg = document.getElementById("fw-msg");
+document.getElementById("btn-fw-check").addEventListener("click", async () => {
+  fwInfoEl.textContent = "조회 중…";
+  const r = await fetch("/api/fw/check").then(x => x.json());
+  if (r.error) {
+    fwRelease = null; fwApplyBtn.disabled = true;
+    fwInfoEl.textContent = r.error;
+    return;
+  }
+  fwRelease = r;
+  const a = r.assets[0];
+  fwInfoEl.innerHTML =
+    `최신 릴리스: <b>${r.tag}</b> (${(r.published_at || "").slice(0, 10)})<br>` +
+    `파일: ${a.name} (${Math.round(a.size / 1024)} KB)` +
+    (r.notes ? `<br><span class="muted">${r.notes}</span>` : "");
+  fwApplyBtn.disabled = false;
+});
+fwApplyBtn.addEventListener("click", async () => {
+  if (!fwRelease) return;
+  const a = fwRelease.assets[0];
+  if (!confirm(`펌웨어 ${fwRelease.tag} (${a.name})를 J-Link 로 플래시합니다.\n` +
+               `보드가 리셋됩니다. 진행할까요?`)) return;
+  const r = await api("/api/fw/apply",
+    { tag: fwRelease.tag, asset_name: a.name, asset_url: a.url });
+  say(fwMsg, r.ok ? "업데이트 시작 — 타임라인에서 진행 확인" : (r.error || "시작 실패"), !r.ok);
+});
+function renderFwUpdate(fu) {
+  if (!fu) return;
+  if (fu.phase === "idle") {
+    if (fwApplyBtn.dataset.busy) { fwApplyBtn.dataset.busy = ""; fwApplyBtn.disabled = !fwRelease; }
+  } else {
+    fwApplyBtn.dataset.busy = "1"; fwApplyBtn.disabled = true;
+    say(fwMsg, fu.detail, false);
+  }
+}
+
+// ---- 대시보드 자기 업데이트 ----
+const updMsg = document.getElementById("upd-msg");
+document.getElementById("btn-upd-check").addEventListener("click", async () => {
+  updMsg.textContent = "확인 중…";
+  const r = await fetch("/api/update/check").then(x => x.json());
+  if (r.error) { updMsg.textContent = r.error; return; }
+  if (r.behind === 0) { updMsg.textContent = "최신 버전입니다 (" + r.current + ")"; return; }
+  updMsg.textContent = `${r.behind}개 업데이트 있음`;
+  if (confirm(`대시보드 업데이트 ${r.behind}건:\n${(r.log || []).join("\n")}\n\n` +
+              `지금 적용하고 재시작할까요?`)) {
+    const a = await api("/api/update/apply");
+    updMsg.textContent = a.ok ? "적용됨 — 재시작 중… (자동 재연결)" : (a.error || "실패");
+  }
+});
 
 // ---- WebSocket ----
 const wsBadge = document.getElementById("ws-badge");
@@ -287,8 +427,11 @@ function connect() {
       timelineEl.textContent = "";
       statusPts.length = 0;
       lastStatus = null;
+      if (m.version) document.getElementById("dash-ver").textContent = m.version;
     }
     renderBadges(m.badges, m.fw_info);
+    refreshLcd(m.badges, m.lcd_png_ts || 0);
+    renderFwUpdate(m.fw_update);
     addConsoleLines(m.console || []);
     addEvents(m.events || []);
     addStatusPts(m.status_pts || []);

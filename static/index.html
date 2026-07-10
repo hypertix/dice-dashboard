@@ -5,7 +5,9 @@
 <link rel="stylesheet" href="/static/style.css">
 
 <header>
-  <h1>DICE Bench Dashboard</h1>
+  <h1>DICE Bench Dashboard <span class="muted" id="dash-ver"></span></h1>
+  <button class="btn" id="btn-upd-check">업데이트 확인</button>
+  <span class="muted" id="upd-msg"></span>
   <div id="ws-badge" class="badge"><span class="dot"></span><span class="label">서버 연결 중…</span></div>
 </header>
 
@@ -13,13 +15,14 @@
   <div class="badge" id="b-jlink"><span class="dot"></span><span class="label">J-Link</span><span class="sub">—</span></div>
   <div class="badge" id="b-console"><span class="dot"></span><span class="label">UART 콘솔</span><span class="sub">—</span></div>
   <div class="badge" id="b-dice"><span class="dot"></span><span class="label">DICE CDC</span><span class="sub">—</span></div>
+  <div class="badge" id="b-lcd"><span class="dot"></span><span class="label">LCD</span><span class="sub">—</span></div>
   <div class="badge" id="b-fw"><span class="dot"></span><span class="label">펌웨어</span><span class="sub">—</span></div>
 </nav>
 
 <main>
   <section class="col-left">
     <div class="tiles" id="tiles">
-      <div class="tile" id="t-ch1"><div class="t-name">CH1 <small>고장·0 고정</small></div><div class="t-val">—</div></div>
+      <div class="tile" id="t-ch1"><div class="t-name">CH1 <small>측정 고장·0 고정</small></div><div class="t-val">—</div></div>
       <div class="tile" id="t-ch2"><div class="t-name">CH2</div><div class="t-val">—</div></div>
       <div class="tile" id="t-ch3"><div class="t-name">CH3</div><div class="t-val">—</div></div>
       <div class="tile" id="t-ch4"><div class="t-name">CH4</div><div class="t-val">—</div></div>
@@ -47,6 +50,23 @@
     </div>
 
     <div class="card">
+      <div class="card-head">
+        <h2>출력 제어</h2>
+        <label class="hv-switch"><input type="checkbox" id="hv-toggle"> HV</label>
+        <button class="btn btn-danger" id="btn-estop">ESTOP</button>
+      </div>
+      <table class="ctl-table">
+        <thead><tr><th></th><th>파형</th><th>주파수 Hz</th><th>진폭 mA</th><th>위상 °</th></tr></thead>
+        <tbody id="ctl-rows"></tbody>
+      </table>
+      <div class="ctl-actions">
+        <button class="btn btn-primary" id="btn-apply">적용 + 시작</button>
+        <button class="btn" id="btn-stop">전체 정지</button>
+        <span class="muted" id="ctl-msg"></span>
+      </div>
+    </div>
+
+    <div class="card">
       <div class="card-head"><h2>진행사항 타임라인</h2></div>
       <ul id="timeline" class="timeline"></ul>
     </div>
@@ -56,6 +76,24 @@
     <div class="card grow">
       <div class="card-head"><h2>UART 콘솔 <span class="muted" id="console-port"></span></h2></div>
       <div id="console" class="console"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>LCD 화면 <span class="muted" id="lcd-info"></span></h2></div>
+      <div class="lcd-wrap"><img id="lcd-img" alt="LCD 미연결" hidden>
+        <div class="empty-inline" id="lcd-empty">LCD 미연결 (adb)</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>펌웨어 업데이트 <span class="muted">dice-ota 릴리스</span></h2>
+        <button class="btn" id="btn-fw-check">릴리스 확인</button>
+      </div>
+      <div id="fw-info" class="fw-info muted">「릴리스 확인」을 누르면 최신 펌웨어를 조회합니다.</div>
+      <div class="ctl-actions">
+        <button class="btn btn-primary" id="btn-fw-apply" disabled>다운로드 + J-Link 플래시</button>
+        <span class="muted" id="fw-msg"></span>
+      </div>
     </div>
   </section>
 </main>
