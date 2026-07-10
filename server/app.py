@@ -97,4 +97,5 @@ app.mount("/static", StaticFiles(directory=os.path.join(ROOT, "static")), name="
 
 if __name__ == "__main__":
     import uvicorn
+    print(f"DICE 벤치 대시보드: http://localhost:{cfg['http_port']}  (Ctrl+C = 종료)")
     uvicorn.run(app, host="127.0.0.1", port=cfg["http_port"], log_level="warning")
