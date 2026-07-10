@@ -1,46 +1,38 @@
 # -*- coding: utf-8 -*-
-"""J-Link 프로브 연결 감시 — JLink.exe ShowEmuList 를 주기 폴링.
+"""J-Link 프로브 연결 감시 — USB 열거(pyserial)로만 감지.
 
-ShowEmuList 는 USB 열거만 하고 타겟에 연결하지 않으므로
-MCUXpresso 디버그 세션과 병행해도 안전하다.
+JLink.exe 를 실행하지 않는다: J-Link 는 한 프로세스만 잡을 수 있어서
+폴링용 JLink.exe 가 IDE 디버그 세션이나 CLI 플래시(verify_fw.py)와
+프로브 점유 경합을 일으킨다 (실측 2026-07-10 — 플래시가
+"SWD is not supported" 로 오탐 실패). 프로브의 CDC 포트(SEGGER VID 0x1366)
+존재 여부 + USB serial number 로 대체 — 부작용 0.
 """
-import re
-import subprocess
 import threading
 import time
 
+from serial.tools import list_ports
+
 from .state import AppState
 
-_SERIAL_RE = re.compile(r"Serial number:\s*(\d+)")
+SEGGER_VID = 0x1366
 
 
-def _query(jlink_exe: str) -> list:
-    """연결된 J-Link 시리얼 목록. 실패 시 None (도구 문제와 미연결을 구분)."""
-    try:
-        # J-Link Commander 는 스크립트 없이 실행하면 stdin 에서 명령을 읽는다
-        r = subprocess.run(
-            [jlink_exe, "-NoGui", "1"],
-            input="ShowEmuList USB\nExit\n",
-            capture_output=True, text=True, timeout=15,
-        )
-        return _SERIAL_RE.findall(r.stdout)
-    except FileNotFoundError:
-        return None
-    except Exception:
-        return None
+def _query() -> list:
+    """USB 에 붙은 SEGGER 프로브 시리얼 목록 (CDC 포트 기준)."""
+    serials = set()
+    for p in list_ports.comports():
+        if p.vid == SEGGER_VID:
+            serials.add(p.serial_number or "?")
+    return sorted(serials)
 
 
 def start(state: AppState, cfg: dict) -> threading.Thread:
-    jlink_exe = cfg.get("jlink_exe", r"C:\Program Files\SEGGER\JLink_V926\JLink.exe")
-    interval = cfg.get("jlink_poll_sec", 5)
+    interval = cfg.get("jlink_poll_sec", 3)
 
     def run():
         while True:
-            serials = _query(jlink_exe)
-            if serials is None:
-                state.set_badge("jlink", state="error", serials=[],
-                                detail="JLink.exe 실행 실패 — config.json 의 jlink_exe 경로 확인")
-            elif serials:
+            serials = _query()
+            if serials:
                 state.set_badge("jlink", state="connected", serials=serials, detail="")
             else:
                 state.set_badge("jlink", state="disconnected", serials=[], detail="")
