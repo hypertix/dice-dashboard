@@ -20,11 +20,11 @@ import subprocess
 import threading
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import console_tail, dice_link, fw_update, jlink_watch, lcd_watch
+from . import console_tail, dice_link, fw_update, jlink_watch
 from .state import AppState
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -38,9 +38,6 @@ DEFAULT_CONFIG = {
     "dice_port": None,           # null = NXP VID 로 자동 감지
     "jlink_exe": r"C:\Program Files\SEGGER\JLink_V926\JLink.exe",
     "jlink_poll_sec": 3,
-    "adb_exe": "adb",
-    "lcd_addr": "192.168.50.78:5555",
-    "lcd_shot_sec": 5,
     "ota_repo": "hypertix/dice-ota",
     "github_token": None,        # dice-ota 가 private 일 때만 필요
 }
@@ -75,7 +72,6 @@ async def startup():
         state.version = r.stdout.strip()
     jlink_watch.start(state, cfg)
     console_tail.start(state, cfg)
-    lcd_watch.start(state, cfg)
     link = dice_link.start(state, cfg)
     state.add_event("dashboard", "info", f"대시보드 시작 (버전 {state.version})")
 
@@ -144,15 +140,6 @@ async def api_cmd(c: CmdIn):
     state.add_event("control", "info" if ok else "error",
                     ("TX " if ok else "송신 실패 ") + desc)
     return {"ok": ok}
-
-
-# ---- LCD 스크린샷 (③ LCD 연동) ----
-@app.get("/api/lcd/screen.png")
-async def api_lcd_screen():
-    if not state.lcd_png:
-        return JSONResponse({"error": "LCD 스크린샷 없음"}, status_code=404)
-    return Response(content=state.lcd_png, media_type="image/png",
-                    headers={"Cache-Control": "no-store"})
 
 
 # ---- 펌웨어 업데이트 (dice-ota 릴리스 → J-Link) ----

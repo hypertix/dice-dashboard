@@ -27,13 +27,10 @@ class AppState:
             "jlink":   {"state": "unknown", "serials": [], "ts": 0},
             "console": {"state": "unknown", "port": None, "ts": 0},
             "dice":    {"state": "unknown", "port": None, "ts": 0},
-            "lcd":     {"state": "unknown", "addr": None, "ts": 0},
         }
         self.fw_info = None                   # GET_INFO 응답 {fw, hw, proto}
         self.ports = []                       # 마지막 COM 스캔 결과
         self.version = "dev"                  # 대시보드 버전 (git describe)
-        self.lcd_png = None                   # LCD 스크린샷 (PNG bytes)
-        self.lcd_png_ts = 0.0
         self.fw_update = {"phase": "idle", "detail": ""}   # OTA 플래시 진행 상태
 
         os.makedirs(log_dir, exist_ok=True)
@@ -84,11 +81,6 @@ class AppState:
         with self.lock:
             self.ports = ports
 
-    def set_lcd_png(self, png: bytes) -> None:
-        with self.lock:
-            self.lcd_png = png
-            self.lcd_png_ts = time.time()
-
     def set_fw_update(self, phase: str, detail: str = "") -> None:
         with self.lock:
             self.fw_update = {"phase": phase, "detail": detail}
@@ -105,7 +97,6 @@ class AppState:
                 "badges": {k: dict(v) for k, v in self.badges.items()},
                 "fw_info": self.fw_info,
                 "fw_update": dict(self.fw_update),
-                "lcd_png_ts": self.lcd_png_ts,
                 "ports": list(self.ports),
                 "last_status": {"ts": last_status[1], **last_status[2]} if last_status else None,
                 "console": [{"seq": s, "ts": t, "line": l}
@@ -125,7 +116,6 @@ class AppState:
                 "badges": {k: dict(v) for k, v in self.badges.items()},
                 "fw_info": self.fw_info,
                 "fw_update": dict(self.fw_update),
-                "lcd_png_ts": self.lcd_png_ts,
                 "console": [{"seq": s, "ts": t, "line": l}
                             for s, t, l in self.console if s > cursor],
                 "events": [{"seq": s, "ts": t, "source": src, "level": lv, "msg": m}

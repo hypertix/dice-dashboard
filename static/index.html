@@ -15,7 +15,6 @@
   <div class="badge" id="b-jlink"><span class="dot"></span><span class="label">J-Link</span><span class="sub">—</span></div>
   <div class="badge" id="b-console"><span class="dot"></span><span class="label">UART 콘솔</span><span class="sub">—</span></div>
   <div class="badge" id="b-dice"><span class="dot"></span><span class="label">DICE CDC</span><span class="sub">—</span></div>
-  <div class="badge" id="b-lcd"><span class="dot"></span><span class="label">LCD</span><span class="sub">—</span></div>
   <div class="badge" id="b-fw"><span class="dot"></span><span class="label">펌웨어</span><span class="sub">—</span></div>
 </nav>
 
@@ -49,20 +48,52 @@
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-head">
-        <h2>출력 제어</h2>
+    <!-- 출력 제어 — dice_lcd 출력제어 화면 복제 -->
+    <div class="lcdui">
+      <div class="lcdui-rail">
         <label class="hv-switch"><input type="checkbox" id="hv-toggle"> HV</label>
-        <button class="btn btn-danger" id="btn-estop">ESTOP</button>
+        <button id="btn-estop" class="lcdui-estop">비상정지<small>STOP ALL + HV OFF</small></button>
       </div>
-      <table class="ctl-table">
-        <thead><tr><th></th><th>파형</th><th>주파수 Hz</th><th>진폭 mA</th><th>위상 °</th></tr></thead>
-        <tbody id="ctl-rows"></tbody>
-      </table>
-      <div class="ctl-actions">
-        <button class="btn btn-primary" id="btn-apply">적용 + 시작</button>
-        <button class="btn" id="btn-stop">전체 정지</button>
-        <span class="muted" id="ctl-msg"></span>
+      <div class="lcdui-main">
+        <div class="lcdui-chtabs" id="chtabs"></div>
+        <div class="lcdui-panel">
+          <div class="lcdui-label">파형 종류</div>
+          <div class="lcdui-waves" id="waves"></div>
+          <div class="lcdui-params">
+            <div class="p">
+              <div class="lcdui-label">주파수 (사인: 4채널 공통)</div>
+              <div class="valbox"><input id="p-freq" type="number" min="1" max="200000" step="any"><span class="unit">Hz</span></div>
+              <div class="step"><button data-p="freq" data-d="-1">−</button><button data-p="freq" data-d="1">+</button></div>
+            </div>
+            <div class="p">
+              <div class="lcdui-label">진폭 (P-P)</div>
+              <div class="valbox"><input id="p-amp" type="number" min="0" max="124" step="any"><span class="unit">mA</span></div>
+              <div class="step"><button data-p="amp" data-d="-1">−</button><button data-p="amp" data-d="1">+</button></div>
+            </div>
+            <div class="p">
+              <div class="lcdui-label"><span class="phdot">●</span> 위상</div>
+              <div class="valbox"><input id="p-phase" type="number" min="0" max="359.99" step="any"><span class="unit">°</span></div>
+              <div class="step"><button data-p="phase" data-d="-1">−</button><button data-p="phase" data-d="1">+</button></div>
+            </div>
+            <div class="p">
+              <div class="lcdui-label">버스트 (0=연속)</div>
+              <div class="valbox"><input id="p-cycles" type="number" min="0" max="1000000" step="1"><span class="unit">회</span></div>
+              <div class="step"><button data-p="cycles" data-d="-1">−</button><button data-p="cycles" data-d="1">+</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="lcdui-bottom">
+          <div class="lcdui-scope"><canvas id="preview"></canvas></div>
+          <div class="lcdui-side">
+            <div class="lcdui-rms"><div class="lcdui-label">실측 전류 RMS</div><b id="rms-sel">0.00 mA</b></div>
+            <button id="btn-ch-run" class="lcdui-run">▶ CH1 출력 시작</button>
+            <div class="lcdui-allrow">
+              <button id="btn-all-start" class="lcdui-all start">전체 시작</button>
+              <button id="btn-all-stop" class="lcdui-all stop">전체 정지</button>
+            </div>
+            <span class="muted" id="ctl-msg"></span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -76,12 +107,6 @@
     <div class="card grow">
       <div class="card-head"><h2>UART 콘솔 <span class="muted" id="console-port"></span></h2></div>
       <div id="console" class="console"></div>
-    </div>
-
-    <div class="card">
-      <div class="card-head"><h2>LCD 화면 <span class="muted" id="lcd-info"></span></h2></div>
-      <div class="lcd-wrap"><img id="lcd-img" alt="LCD 미연결" hidden>
-        <div class="empty-inline" id="lcd-empty">LCD 미연결 (adb)</div></div>
     </div>
 
     <div class="card">

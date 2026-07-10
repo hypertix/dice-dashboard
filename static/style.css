@@ -153,27 +153,122 @@ main {
 
 .hv-switch { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); font-size: 13px; }
 .hv-switch input { accent-color: var(--good); width: 16px; height: 16px; }
-
-.ctl-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.ctl-table th { color: var(--muted); font-weight: 600; text-align: left; padding: 2px 6px; }
-.ctl-table td { padding: 3px 6px; }
-.ctl-table input[type="number"], .ctl-table select {
-  width: 100%; box-sizing: border-box;
-  background: #111110; color: var(--ink);
-  border: 1px solid var(--border); border-radius: 6px;
-  padding: 4px 6px; font: inherit; font-size: 13px;
-}
-.ctl-table input[type="checkbox"] { width: 15px; height: 15px; }
-.ctl-ch { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); font-weight: 600; white-space: nowrap; }
-.ctl-ch .sw { width: 9px; height: 9px; border-radius: 2px; }
 .ctl-actions { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
 
-/* LCD / 펌웨어 카드 */
-.lcd-wrap { position: relative; min-height: 60px; }
-#lcd-img { width: 100%; border-radius: 8px; border: 1px solid var(--border); display: block; }
-.empty-inline { color: var(--muted); padding: 14px 4px; }
+/* 펌웨어 카드 */
 .fw-info { font-size: 13px; line-height: 1.5; white-space: pre-wrap; }
 .fw-info b { color: var(--ink); }
+
+/* ==== 출력 제어 — dice_lcd 출력제어 화면 복제 (색/배치 LCD 실물 기준) ==== */
+.lcdui {
+  --lbg:      #0f1626;   /* LCD 페이지 배경 (다크 네이비) */
+  --lpanel:   #1a2338;
+  --ldeep:    #0c1425;
+  --lborder:  #263252;
+  --lblue:    #3b82f6;
+  --lch1:     #2fbf71;   /* LCD 채널색: CH1 초록 */
+  --lch2:     #3f8cff;   /*            CH2 파랑 */
+  --lch3:     #e7b41c;   /*            CH3 노랑 */
+  --lch4:     #ef6eae;   /*            CH4 핑크 */
+  display: flex; gap: 12px;
+  background: var(--lbg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  color: #e8ecf5;
+}
+.lcdui .lcdui-label { color: #8b94ab; font-size: 12px; font-weight: 600; }
+.lcdui .phdot { color: var(--lblue); font-size: 9px; vertical-align: 2px; }
+
+.lcdui-rail { display: flex; flex-direction: column; justify-content: space-between; gap: 10px; width: 96px; flex: none; }
+.lcdui-estop {
+  background: #ef5350; color: #fff;
+  border: 0; border-radius: 10px;
+  padding: 14px 6px; font: inherit; font-size: 16px; font-weight: 800; cursor: pointer;
+  display: flex; flex-direction: column; gap: 3px; align-items: center;
+}
+.lcdui-estop small { font-size: 8.5px; font-weight: 700; opacity: 0.9; letter-spacing: 0.2px; }
+.lcdui-estop:active { filter: brightness(0.85); }
+.lcdui .hv-switch { color: #aeb7cc; }
+
+.lcdui-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+
+.lcdui-chtabs { display: flex; gap: 12px; }
+.lcdui-chtabs button {
+  flex: 1; padding: 9px 0; font: inherit; font-size: 16px; font-weight: 700;
+  background: transparent; border-radius: 10px; cursor: pointer;
+  border: 2px solid var(--chc); color: var(--chc);
+  position: relative;
+}
+.lcdui-chtabs button.sel { background: var(--chc); color: #0c1425; }
+.lcdui-chtabs button .rundot {
+  position: absolute; top: 6px; right: 8px; width: 7px; height: 7px; border-radius: 50%;
+  background: currentColor; opacity: 0;
+}
+.lcdui-chtabs button.running .rundot { opacity: 1; animation: blink 1s infinite; }
+@keyframes blink { 50% { opacity: 0.2; } }
+
+.lcdui-panel { background: var(--lpanel); border-radius: 12px; padding: 12px 14px; }
+.lcdui-waves { display: flex; gap: 10px; margin: 8px 0 12px; }
+.lcdui-waves button {
+  min-width: 76px; padding: 9px 0; font: inherit; font-size: 15px; font-weight: 600;
+  background: var(--ldeep); color: #e8ecf5;
+  border: 1px solid var(--lborder); border-radius: 9px; cursor: pointer;
+}
+.lcdui-waves button.sel { background: var(--lblue); border-color: var(--lblue); color: #fff; }
+
+.lcdui-params { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.lcdui-params .p { display: flex; flex-direction: column; gap: 7px; }
+.lcdui-params .valbox {
+  display: flex; align-items: center;
+  background: var(--ldeep); border: 2px solid var(--lblue); border-radius: 9px;
+  padding: 7px 10px;
+}
+.lcdui-params .valbox input {
+  flex: 1; min-width: 0; background: transparent; border: 0; outline: none;
+  color: #fff; font: inherit; font-size: 18px; font-weight: 700; text-align: right;
+  -moz-appearance: textfield;
+}
+.lcdui-params .valbox input::-webkit-outer-spin-button,
+.lcdui-params .valbox input::-webkit-inner-spin-button { -webkit-appearance: none; }
+.lcdui-params .valbox .unit { color: #fff; font-size: 16px; font-weight: 700; margin-left: 5px; }
+.lcdui-params .step { display: flex; gap: 8px; }
+.lcdui-params .step button {
+  flex: 1; padding: 7px 0; font-size: 18px; font-weight: 700;
+  background: #4a5368; color: #fff; border: 0; border-radius: 9px; cursor: pointer;
+}
+.lcdui-params .step button:active { filter: brightness(1.2); }
+
+.lcdui-bottom { display: flex; gap: 12px; }
+.lcdui-scope {
+  flex: 1; min-width: 0; height: 190px;
+  background: var(--ldeep); border: 1px solid var(--lborder); border-radius: 10px;
+}
+.lcdui-scope canvas { width: 100%; height: 100%; display: block; }
+.lcdui-side { width: 280px; flex: none; display: flex; flex-direction: column; gap: 10px; }
+.lcdui-rms {
+  background: #05070d; border-radius: 10px; padding: 10px 14px;
+}
+.lcdui-rms b { display: block; font-size: 26px; font-weight: 800; margin-top: 2px; }
+.lcdui-run {
+  padding: 14px 0; font: inherit; font-size: 18px; font-weight: 800;
+  background: #3ddc8e; color: #06281a; border: 0; border-radius: 10px; cursor: pointer;
+}
+.lcdui-run.running { background: #e35d5d; color: #fff; }
+.lcdui-run:disabled { opacity: 0.5; cursor: default; }
+.lcdui-allrow { display: flex; gap: 10px; }
+.lcdui-all {
+  flex: 1; padding: 11px 0; font: inherit; font-size: 15px; font-weight: 700;
+  border: 0; border-radius: 9px; cursor: pointer; color: #fff;
+}
+.lcdui-all.start { background: #1d6b40; }
+.lcdui-all.stop { background: #8a2727; }
+
+@media (max-width: 900px) {
+  .lcdui-params { grid-template-columns: repeat(2, 1fr); }
+  .lcdui-bottom { flex-direction: column; }
+  .lcdui-side { width: auto; }
+}
 
 /* 타임라인 */
 .timeline { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; }

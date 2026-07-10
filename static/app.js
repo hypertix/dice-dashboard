@@ -1,4 +1,4 @@
-// DICE 벤치 대시보드 프론트엔드 — WS delta 수신 + 캔버스 스트립 차트 + 제어/업데이트.
+// DICE 벤치 대시보드 프론트엔드 — WS delta 수신 + 스트립 차트 + LCD 복제 제어 + 업데이트.
 "use strict";
 
 const SERIES = [
@@ -7,15 +7,16 @@ const SERIES = [
   { key: 2, name: "CH3", color: cssVar("--series-3") },
   { key: 3, name: "CH4", color: cssVar("--series-4") },
 ];
-const WINDOW_SEC = 60;          // 차트 표시 구간
-const MAX_PTS = 1500;           // 10 Hz × 2.5분
+// LCD(dice_lcd) 출력제어 화면의 채널 색 — 복제 UI 전용
+const LCH = ["#2fbf71", "#3f8cff", "#e7b41c", "#ef6eae"];
+const WINDOW_SEC = 60;
+const MAX_PTS = 1500;
 const MAX_CONSOLE = 500;
 const MAX_TIMELINE = 200;
 
-const statusPts = [];           // {ts, meas[4], hv, strm, run, alarm}
+const statusPts = [];
 let lastStatus = null;
-let serverOffset = 0;           // server now - client now (표시 시각 보정)
-let lastLcdTs = 0;
+let serverOffset = 0;
 
 function cssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
 function fmtTime(ts) {
@@ -77,8 +78,6 @@ function renderBadges(badges, fwInfo) {
   setBadge("b-dice", d.state,
     d.port ? d.port + (d.state === "busy" ? " 점유됨" : d.state === "open" ? "" : " 끊김") : "없음",
     d.detail);
-  const l = badges.lcd;
-  setBadge("b-lcd", l.state, l.state === "connected" ? l.addr : "미연결", l.detail);
   setBadge("b-fw", fwInfo ? "connected" : "unknown",
     fwInfo ? "v" + fwInfo.fw + " (proto " + fwInfo.proto + ")" : "—");
 }
@@ -101,14 +100,15 @@ function renderTiles() {
   run.className = "chip" + (lastStatus.run ? " on" : "");
   alarm.textContent = lastStatus.alarm ? "ALARM 0x" + lastStatus.alarm.toString(16).toUpperCase() : "ALARM";
   alarm.className = "chip" + (lastStatus.alarm ? " alarm-on" : "");
-  // HV 토글은 실제 상태를 따라감 (사용자가 만지는 중이 아닐 때)
   const hvToggle = document.getElementById("hv-toggle");
   if (document.activeElement !== hvToggle) hvToggle.checked = !!lastStatus.hv;
+  renderLcdRunState();
 }
 
 // ---- 콘솔 ----
 const consoleEl = document.getElementById("console");
 function classifyLine(line) {
+  if (/CFG_ERROR=0x\s*0\b/.test(line)) return "";        // 정상 진단 라인 오탐 방지
   if (/FAIL|ERROR|Malloc failed|stack overflow/i.test(line)) return "fail";
   if (/dropped|WARN/i.test(line)) return "warn";
   if (/PASS|OK/.test(line)) return "pass";
@@ -162,7 +162,7 @@ function addStatusPts(items) {
 const canvas = document.getElementById("chart");
 const ctx = canvas.getContext("2d");
 const tooltip = document.getElementById("tooltip");
-let hoverX = null;              // 캔버스 CSS 좌표
+let hoverX = null;
 const PAD = { l: 56, r: 52, t: 8, b: 22 };
 
 function niceCeil(v) {
@@ -187,7 +187,6 @@ function drawChart() {
   const pts = statusPts.filter(p => p.ts >= t0);
   const plotW = w - PAD.l - PAD.r, plotH = h - PAD.t - PAD.b;
 
-  // y 스케일: 표시 구간 최대값 기준 nice ceil (µA)
   let vmax = 100;
   for (const p of pts) for (const v of p.meas) if (v > vmax) vmax = v;
   vmax = niceCeil(vmax * 1.1);
@@ -195,7 +194,6 @@ function drawChart() {
   const xOf = ts => PAD.l + (ts - t0) / WINDOW_SEC * plotW;
   const yOf = v => PAD.t + plotH - (v / vmax) * plotH;
 
-  // 그리드 + y 라벨
   ctx.strokeStyle = cssVar("--grid");
   ctx.fillStyle = cssVar("--muted");
   ctx.font = "11px system-ui";
@@ -206,19 +204,16 @@ function drawChart() {
     ctx.beginPath(); ctx.moveTo(PAD.l, y); ctx.lineTo(w - PAD.r, y); ctx.stroke();
     ctx.fillText(v >= 1000 ? (v / 1000) + "k" : String(Math.round(v)), PAD.l - 8, y);
   }
-  // x 라벨 (시각, 15초 간격)
   ctx.textAlign = "center"; ctx.textBaseline = "top";
   for (let s = 0; s <= WINDOW_SEC; s += 15) {
     const ts = t0 + s, x = xOf(ts);
     ctx.fillText(fmtTime(ts).slice(3), x, h - PAD.b + 6);
   }
-  // 베이스라인
   ctx.strokeStyle = cssVar("--baseline");
   ctx.beginPath();
   ctx.moveTo(PAD.l, PAD.t + plotH + 0.5); ctx.lineTo(w - PAD.r, PAD.t + plotH + 0.5);
   ctx.stroke();
 
-  // 시리즈 라인 (2px) + 우측 직접 라벨
   const labelYs = [];
   for (const s of SERIES) {
     ctx.strokeStyle = s.color;
@@ -233,7 +228,6 @@ function drawChart() {
     }
     if (started) ctx.stroke();
     if (lastY != null) {
-      // 직접 라벨 (CVD 보조 인코딩) — 겹치면 아래로 밀기
       let ly = Math.min(Math.max(lastY, PAD.t + 6), PAD.t + plotH - 6);
       while (labelYs.some(v => Math.abs(v - ly) < 13)) ly += 13;
       labelYs.push(ly);
@@ -245,7 +239,6 @@ function drawChart() {
     }
   }
 
-  // 호버 크로스헤어 + 툴팁
   if (hoverX != null && pts.length) {
     const tsAt = t0 + (hoverX - PAD.l) / plotW * WINDOW_SEC;
     let best = pts[0];
@@ -278,82 +271,214 @@ function drawChart() {
 
 canvas.addEventListener("mousemove", e => { hoverX = e.offsetX; });
 canvas.addEventListener("mouseleave", () => { hoverX = null; tooltip.hidden = true; });
-
-// 데이터가 없어도 축이 흐르도록 5 Hz 재그리기
 setInterval(drawChart, 200);
-window.addEventListener("resize", drawChart);
+window.addEventListener("resize", () => { drawChart(); drawPreview(); });
 
-// ---- 출력 제어 패널 ----
-const WAVES = [[0, "사인"], [1, "구형"], [2, "톱니"], [3, "펄스"], [4, "임의(SRAM)"]];
-const ctlRows = document.getElementById("ctl-rows");
-for (const s of SERIES) {
-  const tr = document.createElement("tr");
-  tr.innerHTML =
-    `<td><label class="ctl-ch"><input type="checkbox" id="en-${s.key}" checked>` +
-    `<span class="sw" style="background:${s.color}"></span>${s.name}</label></td>` +
-    `<td><select id="wv-${s.key}">` +
-    WAVES.map(([v, n]) => `<option value="${v}">${n}</option>`).join("") +
-    `</select></td>` +
-    `<td><input type="number" id="fq-${s.key}" value="1000" min="1" max="200000" step="any"></td>` +
-    `<td><input type="number" id="am-${s.key}" value="5" min="0" max="62" step="any"></td>` +
-    `<td><input type="number" id="ph-${s.key}" value="0" min="0" max="359.99" step="any"></td>`;
-  ctlRows.appendChild(tr);
+// ==== 출력 제어 — dice_lcd 출력제어 화면 복제 ====
+const WAVES = ["사인", "구형", "톱니", "펄스", "임의"];
+// 채널별 설정 (LCD 기본값과 동일: 사인 1 kHz, 50 mA P-P, 0°, 연속)
+const chSettings = [0, 1, 2, 3].map(() => ({ type: 0, freq: 1000, ampPP: 50, phase: 0, cycles: 0 }));
+let selCh = 0;
+
+const chtabsEl = document.getElementById("chtabs");
+for (let i = 0; i < 4; i++) {
+  const b = document.createElement("button");
+  b.style.setProperty("--chc", LCH[i]);
+  b.innerHTML = `CH${i + 1}<span class="rundot"></span>`;
+  b.addEventListener("click", () => { saveInputs(); selCh = i; loadInputs(); });
+  chtabsEl.appendChild(b);
 }
+const wavesEl = document.getElementById("waves");
+WAVES.forEach((name, t) => {
+  const b = document.createElement("button");
+  b.textContent = name;
+  b.addEventListener("click", () => {
+    chSettings[selCh].type = t;
+    renderLcdSel();
+    drawPreview();
+  });
+  wavesEl.appendChild(b);
+});
+
+const inFreq = document.getElementById("p-freq");
+const inAmp = document.getElementById("p-amp");
+const inPhase = document.getElementById("p-phase");
+const inCycles = document.getElementById("p-cycles");
+
+function saveInputs() {
+  const s = chSettings[selCh];
+  s.freq = Math.min(200000, Math.max(1, +inFreq.value || 1));
+  s.ampPP = Math.min(124, Math.max(0, +inAmp.value || 0));
+  s.phase = ((+inPhase.value || 0) % 360 + 360) % 360;
+  s.cycles = Math.max(0, Math.round(+inCycles.value || 0));
+}
+function loadInputs() {
+  const s = chSettings[selCh];
+  inFreq.value = s.freq;
+  inAmp.value = s.ampPP;
+  inPhase.value = s.phase;
+  inCycles.value = s.cycles;
+  renderLcdSel();
+  renderLcdRunState();
+  drawPreview();
+}
+for (const el of [inFreq, inAmp, inPhase, inCycles]) {
+  el.addEventListener("change", () => { saveInputs(); loadInputs(); });
+}
+// +/- 스테퍼 (주파수 ±100 Hz, 진폭 ±1 mA, 위상 ±15°, 버스트 ±1)
+const STEP = { freq: 100, amp: 1, phase: 15, cycles: 1 };
+document.querySelectorAll(".lcdui-params .step button").forEach(b => {
+  b.addEventListener("click", () => {
+    saveInputs();
+    const s = chSettings[selCh], d = +b.dataset.d;
+    if (b.dataset.p === "freq") s.freq = Math.min(200000, Math.max(1, s.freq + d * STEP.freq));
+    if (b.dataset.p === "amp") s.ampPP = Math.min(124, Math.max(0, s.ampPP + d * STEP.amp));
+    if (b.dataset.p === "phase") s.phase = ((s.phase + d * STEP.phase) % 360 + 360) % 360;
+    if (b.dataset.p === "cycles") s.cycles = Math.max(0, s.cycles + d);
+    loadInputs();
+  });
+});
+
+function renderLcdSel() {
+  [...chtabsEl.children].forEach((b, i) => b.classList.toggle("sel", i === selCh));
+  [...wavesEl.children].forEach((b, t) => b.classList.toggle("sel", t === chSettings[selCh].type));
+}
+function renderLcdRunState() {
+  const run = lastStatus ? lastStatus.run : 0;
+  [...chtabsEl.children].forEach((b, i) => b.classList.toggle("running", !!(run >> i & 1)));
+  const btn = document.getElementById("btn-ch-run");
+  const running = !!(run >> selCh & 1);
+  btn.textContent = running ? `■ CH${selCh + 1} 출력 정지` : `▶ CH${selCh + 1} 출력 시작`;
+  btn.classList.toggle("running", running);
+  const rms = document.getElementById("rms-sel");
+  const v = lastStatus ? lastStatus.meas[selCh] : 0;
+  rms.textContent = (v / 1000).toFixed(2) + " mA";
+  rms.style.color = LCH[selCh];
+}
+
+// 파형 미리보기 (10 ms 창, 설정 파형 합성 — LCD 스코프 영역과 동일 배치)
+const pvCanvas = document.getElementById("preview");
+function drawPreview() {
+  const dpr = window.devicePixelRatio || 1;
+  const w = pvCanvas.clientWidth, h = pvCanvas.clientHeight;
+  if (!w || !h) return;
+  if (pvCanvas.width !== w * dpr || pvCanvas.height !== h * dpr) {
+    pvCanvas.width = w * dpr; pvCanvas.height = h * dpr;
+  }
+  const c = pvCanvas.getContext("2d");
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, w, h);
+  const s = chSettings[selCh];
+  const ampPk = s.ampPP / 2;
+  const yFull = Math.max(1, ampPk * 1.25);
+  // 그리드
+  c.strokeStyle = "#1d2946";
+  c.lineWidth = 1;
+  for (let i = 1; i < 8; i++) {
+    const x = Math.round(w * i / 8) + 0.5;
+    c.beginPath(); c.moveTo(x, 0); c.lineTo(x, h); c.stroke();
+  }
+  for (let i = 1; i < 4; i++) {
+    const y = Math.round(h * i / 4) + 0.5;
+    c.beginPath(); c.moveTo(0, y); c.lineTo(w, y); c.stroke();
+  }
+  c.fillStyle = "#5a647c";
+  c.font = "10px system-ui";
+  c.textAlign = "left"; c.textBaseline = "top";
+  c.fillText(`+${yFull.toFixed(0)} mA`, 5, 4);
+  c.textBaseline = "bottom";
+  c.fillText(`−${yFull.toFixed(0)} mA`, 5, h - 4);
+  c.textAlign = "right";
+  c.fillText("10 ms", w - 6, h - 4);
+  // 파형
+  const mid = h / 2, T = 0.01;
+  const periods = s.freq * T;
+  c.strokeStyle = LCH[selCh];
+  c.lineWidth = 2;
+  if (s.ampPP <= 0) {
+    c.beginPath(); c.moveTo(0, mid); c.lineTo(w, mid); c.stroke();
+  } else if (periods > w / 6) {
+    // 창 안에 주기가 너무 많으면 envelope 밴드로 표시
+    const yA = mid - (ampPk / yFull) * (h / 2);
+    const yB = mid + (ampPk / yFull) * (h / 2);
+    c.globalAlpha = 0.25;
+    c.fillStyle = LCH[selCh];
+    c.fillRect(0, yA, w, yB - yA);
+    c.globalAlpha = 1;
+    c.beginPath(); c.moveTo(0, yA); c.lineTo(w, yA); c.stroke();
+    c.beginPath(); c.moveTo(0, yB); c.lineTo(w, yB); c.stroke();
+  } else {
+    if (s.type === 4) c.setLineDash([5, 4]);       // 임의(SRAM) = 점선 사인 표시
+    c.beginPath();
+    for (let x = 0; x <= w; x++) {
+      const t = x / w * T;
+      let ph = s.freq * t + s.phase / 360;
+      const fr = ph - Math.floor(ph);
+      let v;
+      switch (s.type) {
+        case 1: v = fr < 0.5 ? 1 : -1; break;                     // 구형
+        case 2: v = 2 * fr - 1; break;                            // 톱니
+        case 3: v = fr < 0.15 ? 1 : 0; break;                     // 펄스
+        default: v = Math.sin(2 * Math.PI * ph); break;           // 사인/임의
+      }
+      const y = mid - (v * ampPk / yFull) * (h / 2);
+      if (x === 0) c.moveTo(x, y); else c.lineTo(x, y);
+    }
+    c.stroke();
+    c.setLineDash([]);
+  }
+}
+
+// ---- 제어 명령 ----
 const ctlMsg = document.getElementById("ctl-msg");
 function say(el, text, isErr) {
   el.textContent = text;
-  el.style.color = isErr ? cssVar("--critical") : cssVar("--muted")
+  el.style.color = isErr ? "#ef5350" : "";
   if (text) setTimeout(() => { if (el.textContent === text) el.textContent = ""; }, 6000);
 }
-
+async function sendWaveform(i) {
+  const s = chSettings[i];
+  return api("/api/cmd", {
+    action: "waveform", ch: i + 1, type: s.type,
+    freq_hz: s.freq, amp_ma: s.ampPP / 2,            // UI 는 P-P, 프로토콜은 peak
+    phase_deg: s.phase, cycles: s.cycles,
+  });
+}
 document.getElementById("hv-toggle").addEventListener("change", async e => {
   const r = await api("/api/cmd", { action: "hv", on: e.target.checked });
   if (!r.ok) say(ctlMsg, r.error || "HV 명령 실패", true);
 });
 document.getElementById("btn-estop").addEventListener("click", async () => {
   const r = await api("/api/cmd", { action: "estop" });
-  say(ctlMsg, r.ok ? "ESTOP 전송됨" : (r.error || "ESTOP 실패"), !r.ok);
+  say(ctlMsg, r.ok ? "비상정지 전송됨" : (r.error || "비상정지 실패"), !r.ok);
 });
-document.getElementById("btn-stop").addEventListener("click", async () => {
-  const r = await api("/api/cmd", { action: "stop", mask: 0x0F });
-  say(ctlMsg, r.ok ? "전체 정지 전송됨" : (r.error || "정지 실패"), !r.ok);
-});
-document.getElementById("btn-apply").addEventListener("click", async () => {
-  let mask = 0;
-  for (const s of SERIES) {
-    if (!document.getElementById(`en-${s.key}`).checked) continue;
-    mask |= 1 << s.key;
-    const r = await api("/api/cmd", {
-      action: "waveform", ch: s.key + 1,
-      type: +document.getElementById(`wv-${s.key}`).value,
-      freq_hz: +document.getElementById(`fq-${s.key}`).value,
-      amp_ma: +document.getElementById(`am-${s.key}`).value,
-      phase_deg: +document.getElementById(`ph-${s.key}`).value,
-    });
-    if (!r.ok) { say(ctlMsg, `${s.name} 설정 실패: ${r.error || ""}`, true); return; }
-  }
-  if (!mask) { say(ctlMsg, "켤 채널이 없습니다 (체크박스 확인)", true); return; }
-  const r = await api("/api/cmd", { action: "start", mask });
-  say(ctlMsg, r.ok ? "적용 + 시작 전송됨" : (r.error || "시작 실패"), !r.ok);
-});
-
-// ---- LCD 스크린샷 ----
-function refreshLcd(badges, lcdTs) {
-  const img = document.getElementById("lcd-img");
-  const empty = document.getElementById("lcd-empty");
-  const info = document.getElementById("lcd-info");
-  if (badges.lcd.state === "connected" && lcdTs > 0) {
-    if (lcdTs !== lastLcdTs) {
-      lastLcdTs = lcdTs;
-      img.src = "/api/lcd/screen.png?t=" + lcdTs;
-    }
-    img.hidden = false; empty.hidden = true;
-    info.textContent = "(" + fmtTime(lcdTs) + " 캡처)";
+document.getElementById("btn-ch-run").addEventListener("click", async () => {
+  saveInputs();
+  const running = lastStatus && (lastStatus.run >> selCh & 1);
+  if (running) {
+    const r = await api("/api/cmd", { action: "stop", mask: 1 << selCh });
+    say(ctlMsg, r.ok ? `CH${selCh + 1} 정지` : (r.error || "정지 실패"), !r.ok);
   } else {
-    img.hidden = true; empty.hidden = false;
-    info.textContent = "";
+    const r1 = await sendWaveform(selCh);
+    if (!r1.ok) { say(ctlMsg, r1.error || "설정 실패", true); return; }
+    const r2 = await api("/api/cmd", { action: "start", mask: 1 << selCh });
+    say(ctlMsg, r2.ok ? `CH${selCh + 1} 시작` : (r2.error || "시작 실패"), !r2.ok);
   }
-}
+});
+document.getElementById("btn-all-start").addEventListener("click", async () => {
+  saveInputs();
+  for (let i = 0; i < 4; i++) {
+    const r = await sendWaveform(i);
+    if (!r.ok) { say(ctlMsg, `CH${i + 1} 설정 실패: ${r.error || ""}`, true); return; }
+  }
+  const r = await api("/api/cmd", { action: "start", mask: 0x0F });
+  say(ctlMsg, r.ok ? "전체 시작" : (r.error || "시작 실패"), !r.ok);
+});
+document.getElementById("btn-all-stop").addEventListener("click", async () => {
+  const r = await api("/api/cmd", { action: "stop", mask: 0x0F });
+  say(ctlMsg, r.ok ? "전체 정지" : (r.error || "정지 실패"), !r.ok);
+});
+loadInputs();
 
 // ---- 펌웨어 업데이트 (dice-ota) ----
 let fwRelease = null;
@@ -430,7 +555,6 @@ function connect() {
       if (m.version) document.getElementById("dash-ver").textContent = m.version;
     }
     renderBadges(m.badges, m.fw_info);
-    refreshLcd(m.badges, m.lcd_png_ts || 0);
     renderFwUpdate(m.fw_update);
     addConsoleLines(m.console || []);
     addEvents(m.events || []);
