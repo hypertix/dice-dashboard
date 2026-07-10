@@ -1,0 +1,150 @@
+/* DICE 벤치 대시보드 — 다크 벤치 테마.
+   팔레트/잉크 = dataviz 레퍼런스 다크 모드 값 (validate_palette.js 통과). */
+:root {
+  --page:        #0d0d0d;
+  --surface:     #1a1a19;
+  --ink:         #ffffff;
+  --ink-2:       #c3c2b7;
+  --muted:       #898781;
+  --grid:        #2c2c2a;
+  --baseline:    #383835;
+  --border:      rgba(255,255,255,0.10);
+  --series-1:    #3987e5;   /* CH1 blue  */
+  --series-2:    #199e70;   /* CH2 aqua  */
+  --series-3:    #c98500;   /* CH3 yellow */
+  --series-4:    #008300;   /* CH4 green */
+  --good:        #0ca30c;
+  --warning:     #fab219;
+  --critical:    #d03b3b;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  display: flex; align-items: center; gap: 16px;
+  padding: 10px 16px 0;
+}
+header h1 { font-size: 16px; font-weight: 600; margin: 0; flex: 1; }
+
+nav#badges { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 16px; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 7px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 11px;
+}
+.badge .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); flex: none; }
+.badge.ok .dot   { background: var(--good); }
+.badge.warn .dot { background: var(--warning); }
+.badge.err .dot  { background: var(--critical); }
+.badge .label { color: var(--ink-2); font-weight: 600; }
+.badge .sub { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+main {
+  flex: 1; min-height: 0;
+  display: grid; grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr);
+  gap: 12px; padding: 0 16px 16px;
+}
+@media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
+.col-left, .col-right { display: flex; flex-direction: column; gap: 12px; min-width: 0; min-height: 0; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex; flex-direction: column; min-height: 0;
+}
+.card.grow { flex: 1; }
+.card-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.card-head h2 { font-size: 13px; font-weight: 600; color: var(--ink-2); margin: 0; flex: 1; }
+.muted { color: var(--muted); font-weight: 400; }
+
+/* 스탯 타일 */
+.tiles { display: grid; grid-template-columns: repeat(4, 1fr) auto; gap: 8px; }
+@media (max-width: 1400px) { .tiles { grid-template-columns: repeat(4, 1fr); } .tile#t-flags { grid-column: 1 / -1; } }
+.tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+.t-name { color: var(--muted); font-size: 12px; font-weight: 600; }
+.t-name small { font-weight: 400; }
+.t-val { font-size: 22px; font-weight: 650; margin-top: 2px; }
+.t-val .unit { font-size: 12px; color: var(--muted); font-weight: 400; margin-left: 3px; }
+#t-ch1 .t-name::before, #t-ch2 .t-name::before, #t-ch3 .t-name::before, #t-ch4 .t-name::before {
+  content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px;
+}
+#t-ch1 .t-name::before { background: var(--series-1); }
+#t-ch2 .t-name::before { background: var(--series-2); }
+#t-ch3 .t-name::before { background: var(--series-3); }
+#t-ch4 .t-name::before { background: var(--series-4); }
+
+.t-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.chip {
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 2px 8px; font-size: 12px; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.chip.on { color: var(--ink); border-color: var(--good); }
+.chip.alarm-on { color: var(--ink); border-color: var(--critical); background: rgba(208,59,59,0.15); }
+
+/* 차트 */
+.chart-wrap { position: relative; height: 260px; }
+#chart { width: 100%; height: 100%; display: block; }
+.legend { display: flex; gap: 14px; }
+.legend .item { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); font-size: 12px; }
+.legend .sw { width: 10px; height: 10px; border-radius: 3px; }
+.tooltip {
+  position: absolute; pointer-events: none; z-index: 5;
+  background: #222220; border: 1px solid var(--border); border-radius: 8px;
+  padding: 7px 10px; font-size: 12px; color: var(--ink-2);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+}
+.tooltip .tt-time { color: var(--muted); margin-bottom: 3px; }
+.tooltip .row { display: flex; align-items: center; gap: 6px; }
+.tooltip .sw { width: 8px; height: 8px; border-radius: 2px; }
+.empty {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: var(--muted);
+}
+
+/* 콘솔 */
+.console {
+  flex: 1; min-height: 240px; overflow-y: auto;
+  background: #111110; border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 10px;
+  font: 12px/1.5 Consolas, "Cascadia Mono", monospace;
+  color: var(--ink-2);
+  white-space: pre-wrap; word-break: break-all;
+}
+.console .ln { display: block; }
+.console .ts { color: var(--muted); margin-right: 6px; }
+.console .pass { color: var(--good); }
+.console .fail { color: var(--critical); }
+.console .warn { color: var(--warning); }
+
+/* 타임라인 */
+.timeline { list-style: none; margin: 0; padding: 0; max-height: 220px; overflow-y: auto; }
+.timeline li { display: flex; gap: 8px; align-items: baseline; padding: 3px 0; border-bottom: 1px solid var(--grid); }
+.timeline .ts { color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+.timeline .src {
+  flex: none; font-size: 11px; color: var(--ink-2);
+  border: 1px solid var(--border); border-radius: 5px; padding: 0 6px;
+}
+.timeline .msg { color: var(--ink-2); }
+.timeline li.warn .msg { color: var(--warning); }
+.timeline li.error .msg { color: var(--critical); }

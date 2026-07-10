@@ -1,0 +1,63 @@
+<!-- DICE 벤치 대시보드 — 다크 벤치 테마 (로컬 전용) -->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DICE Bench Dashboard</title>
+<link rel="stylesheet" href="/static/style.css">
+
+<header>
+  <h1>DICE Bench Dashboard</h1>
+  <div id="ws-badge" class="badge"><span class="dot"></span><span class="label">서버 연결 중…</span></div>
+</header>
+
+<nav id="badges">
+  <div class="badge" id="b-jlink"><span class="dot"></span><span class="label">J-Link</span><span class="sub">—</span></div>
+  <div class="badge" id="b-console"><span class="dot"></span><span class="label">UART 콘솔</span><span class="sub">—</span></div>
+  <div class="badge" id="b-dice"><span class="dot"></span><span class="label">DICE CDC</span><span class="sub">—</span></div>
+  <div class="badge" id="b-fw"><span class="dot"></span><span class="label">펌웨어</span><span class="sub">—</span></div>
+</nav>
+
+<main>
+  <section class="col-left">
+    <div class="tiles" id="tiles">
+      <div class="tile" id="t-ch1"><div class="t-name">CH1 <small>고장·0 고정</small></div><div class="t-val">—</div></div>
+      <div class="tile" id="t-ch2"><div class="t-name">CH2</div><div class="t-val">—</div></div>
+      <div class="tile" id="t-ch3"><div class="t-name">CH3</div><div class="t-val">—</div></div>
+      <div class="tile" id="t-ch4"><div class="t-name">CH4</div><div class="t-val">—</div></div>
+      <div class="tile" id="t-flags">
+        <div class="t-name">상태</div>
+        <div class="t-chips">
+          <span class="chip" id="c-hv">HV</span>
+          <span class="chip" id="c-strm">STRM</span>
+          <span class="chip" id="c-run">RUN ----</span>
+          <span class="chip" id="c-alarm">ALARM</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <h2>채널 전류 RMS (µA) — 최근 60초</h2>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="chart"></canvas>
+        <div id="tooltip" class="tooltip" hidden></div>
+        <div id="chart-empty" class="empty">STATUS 수신 없음 — DICE USB CDC 연결 대기</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>진행사항 타임라인</h2></div>
+      <ul id="timeline" class="timeline"></ul>
+    </div>
+  </section>
+
+  <section class="col-right">
+    <div class="card grow">
+      <div class="card-head"><h2>UART 콘솔 <span class="muted" id="console-port"></span></h2></div>
+      <div id="console" class="console"></div>
+    </div>
+  </section>
+</main>
+
+<script src="/static/app.js"></script>
