@@ -18,7 +18,7 @@ import os
 import struct
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -186,7 +186,10 @@ async def ws(sock: WebSocket):
 
 @app.get("/")
 async def index():
-    return FileResponse(os.path.join(RES_DIR, "static", "index.html"))
+    """정적 리소스 URL 에 버전 쿼리를 심어 브라우저 캐시 무효화(?v=버전)."""
+    with open(os.path.join(RES_DIR, "static", "index.html"), encoding="utf-8") as f:
+        html = f.read()
+    return HTMLResponse(html.replace("{{v}}", state.version))
 
 
 app.mount("/static", StaticFiles(directory=os.path.join(RES_DIR, "static")), name="static")
