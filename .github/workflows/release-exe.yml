@@ -1,0 +1,50 @@
+# v* 태그를 push 하면 단일 exe 를 빌드해 GitHub Release 에 첨부한다.
+# 사용자(담당자)는 대시보드의 「업데이트 확인」 버튼으로 이 Release 를 받아간다.
+name: release-exe
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 태그 = server/version.py 일치 검사
+        run: python scripts/check_version.py
+
+      - name: 의존성 + PyInstaller 설치
+        run: python -m pip install -r requirements.txt pyinstaller
+
+      - name: exe 빌드
+        run: python -m PyInstaller --clean --noconfirm DiceDashboard.spec
+
+      - name: 기동 스모크 테스트 (/api/state 응답 확인)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "dist\DiceDashboard.exe" -PassThru
+          $ok = $false
+          foreach ($i in 1..30) {
+            Start-Sleep -Seconds 1
+            try {
+              $r = Invoke-RestMethod -Uri "http://127.0.0.1:8765/api/state" -TimeoutSec 2
+              if ($r.version) { $ok = $true; Write-Host "version: $($r.version)"; break }
+            } catch {}
+          }
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          if (-not $ok) { throw "exe smoke test failed: /api/state no response" }
+
+      - name: Release 생성 + exe 첨부
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/DiceDashboard.exe
+          generate_release_notes: true

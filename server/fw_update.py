@@ -23,8 +23,8 @@ FLASH_BASE = "0x08000000"          # RW612 QSPI XIP (dice_RW612 링커 기준)
 _lock = threading.Lock()           # 플래시 동시 실행 방지
 
 
-def _gh_api(cfg: dict, path: str) -> dict:
-    repo = cfg.get("ota_repo", "hypertix/dice-ota")
+def _gh_api(cfg: dict, path: str, repo: str = None) -> dict:
+    repo = repo or cfg.get("ota_repo", "hypertix/dice-ota")
     req = urllib.request.Request(
         f"https://api.github.com/repos/{repo}/{path}",
         headers={"Accept": "application/vnd.github+json",

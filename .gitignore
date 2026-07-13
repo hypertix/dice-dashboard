@@ -3,3 +3,7 @@ __pycache__/
 logs/
 .venv/
 config.json
+build/
+dist/
+*.exe.new
+_dice_update.bat
