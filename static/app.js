@@ -7,8 +7,8 @@ const SERIES = [
   { key: 2, name: "CH3", color: cssVar("--series-3") },
   { key: 3, name: "CH4", color: cssVar("--series-4") },
 ];
-// LCD(dice_lcd) 출력제어 화면의 채널 색 — 복제 UI 전용
-const LCH = ["#2fbf71", "#3f8cff", "#e7b41c", "#ef6eae"];
+// LCD 복제 UI 채널 색 — 스트립 차트 팔레트(--series-*)와 통일
+const LCH = SERIES.map(s => s.color);
 const WINDOW_SEC = 60;
 const MAX_PTS = 1500;
 const MAX_CONSOLE = 500;
@@ -275,7 +275,7 @@ setInterval(drawChart, 200);
 window.addEventListener("resize", () => { drawChart(); drawPreview(); });
 
 // ==== 출력 제어 — dice_lcd 출력제어 화면 복제 ====
-const WAVES = ["사인", "구형", "톱니", "펄스", "임의"];
+const WAVES = ["사인"];
 // 채널별 설정 (LCD 기본값과 동일: 사인 1 kHz, 50 mA P-P, 0°, 연속)
 const chSettings = [0, 1, 2, 3].map(() => ({ type: 0, freq: 1000, ampPP: 50, phase: 0, cycles: 0 }));
 let selCh = 0;
@@ -390,6 +390,8 @@ function drawPreview() {
   c.fillText(`−${yFull.toFixed(0)} mA`, 5, h - 4);
   c.textAlign = "right";
   c.fillText("10 ms", w - 6, h - 4);
+  c.textBaseline = "top";
+  c.fillText("설정 미리보기 (실측 아님)", w - 6, 4);
   // 파형
   const mid = h / 2, T = 0.01;
   const periods = s.freq * T;
@@ -408,24 +410,15 @@ function drawPreview() {
     c.beginPath(); c.moveTo(0, yA); c.lineTo(w, yA); c.stroke();
     c.beginPath(); c.moveTo(0, yB); c.lineTo(w, yB); c.stroke();
   } else {
-    if (s.type === 4) c.setLineDash([5, 4]);       // 임의(SRAM) = 점선 사인 표시
     c.beginPath();
     for (let x = 0; x <= w; x++) {
       const t = x / w * T;
-      let ph = s.freq * t + s.phase / 360;
-      const fr = ph - Math.floor(ph);
-      let v;
-      switch (s.type) {
-        case 1: v = fr < 0.5 ? 1 : -1; break;                     // 구형
-        case 2: v = 2 * fr - 1; break;                            // 톱니
-        case 3: v = fr < 0.15 ? 1 : 0; break;                     // 펄스
-        default: v = Math.sin(2 * Math.PI * ph); break;           // 사인/임의
-      }
+      const ph = s.freq * t + s.phase / 360;
+      const v = Math.sin(2 * Math.PI * ph);
       const y = mid - (v * ampPk / yFull) * (h / 2);
       if (x === 0) c.moveTo(x, y); else c.lineTo(x, y);
     }
     c.stroke();
-    c.setLineDash([]);
   }
 }
 

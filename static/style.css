@@ -10,8 +10,8 @@
   --baseline:    #383835;
   --border:      rgba(255,255,255,0.10);
   /* 채널 색상 (사용자 지정: CH1 노랑 / CH2 초록 / CH3 파랑 / CH4 빨강,
-     validate_palette.js 다크 서피스 검증 통과 — 인접쌍 CVD 는 직접 라벨로 보완) */
-  --series-1:    #c98500;   /* CH1 yellow */
+     인접쌍 CVD 는 직접 라벨로 보완. LCD 복제 UI(LCH)도 이 값을 공유) */
+  --series-1:    #e7b41c;   /* CH1 yellow */
   --series-2:    #008300;   /* CH2 green  */
   --series-3:    #3987e5;   /* CH3 blue   */
   --series-4:    #e66767;   /* CH4 red    */
@@ -166,10 +166,6 @@ main {
   --ldeep:    #0c1425;
   --lborder:  #263252;
   --lblue:    #3b82f6;
-  --lch1:     #2fbf71;   /* LCD 채널색: CH1 초록 */
-  --lch2:     #3f8cff;   /*            CH2 파랑 */
-  --lch3:     #e7b41c;   /*            CH3 노랑 */
-  --lch4:     #ef6eae;   /*            CH4 핑크 */
   display: flex; gap: 12px;
   background: var(--lbg);
   border: 1px solid var(--border);
