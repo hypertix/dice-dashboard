@@ -345,8 +345,38 @@ function loadInputs() {
   renderLcdRunState();
   drawPreview();
 }
+// 값 변경 즉시 적용 — LCD(dicebackend pushWaveform)와 동일 동작.
+// 스테퍼 연타 시 타임라인/시리얼 폭주를 막기 위해 250ms 디바운스로 모아 보낸다.
+const pendingPush = new Set();
+let pushTimer = null;
+function schedulePush(chs) {
+  chs.forEach(i => pendingPush.add(i));
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(async () => {
+    const list = [...pendingPush];
+    pendingPush.clear();
+    for (const i of list) {
+      const r = await sendWaveform(i);
+      if (!r.ok) { say(ctlMsg, r.error || `CH${i + 1} 설정 적용 실패`, true); break; }
+    }
+  }, 250);
+}
+// 사인 주파수는 AD9106 DDS 튜닝 워드 공유로 4채널 공통 — LCD 와 동일하게 동기화
+function syncFreqAll() {
+  const f = chSettings[selCh].freq;
+  chSettings.forEach(c => { c.freq = f; });
+  schedulePush([0, 1, 2, 3]);
+}
 for (const el of [inFreq, inAmp, inPhase, inCycles]) {
-  el.addEventListener("change", () => { saveInputs(); loadInputs(); });
+  el.addEventListener("change", () => {
+    const before = { ...chSettings[selCh] };
+    saveInputs();
+    const s = chSettings[selCh];
+    if (s.freq !== before.freq) syncFreqAll();
+    else if (s.ampPP !== before.ampPP || s.phase !== before.phase || s.cycles !== before.cycles)
+      schedulePush([selCh]);
+    loadInputs();
+  });
 }
 // +/- 스테퍼 (주파수 ±100 Hz, 진폭 ±1 mA, 위상 ±15°, 버스트 ±1)
 const STEP = { freq: 100, amp: 1, phase: 15, cycles: 1 };
@@ -354,10 +384,13 @@ document.querySelectorAll(".lcdui-params .step button").forEach(b => {
   b.addEventListener("click", () => {
     saveInputs();
     const s = chSettings[selCh], d = +b.dataset.d;
-    if (b.dataset.p === "freq") s.freq = Math.min(200000, Math.max(1, s.freq + d * STEP.freq));
-    if (b.dataset.p === "amp") s.ampPP = Math.min(124, Math.max(0, s.ampPP + d * STEP.amp));
-    if (b.dataset.p === "phase") s.phase = ((s.phase + d * STEP.phase) % 360 + 360) % 360;
-    if (b.dataset.p === "cycles") s.cycles = Math.max(0, s.cycles + d);
+    if (b.dataset.p === "freq") {
+      s.freq = Math.min(200000, Math.max(1, s.freq + d * STEP.freq));
+      syncFreqAll();
+    }
+    if (b.dataset.p === "amp") { s.ampPP = Math.min(124, Math.max(0, s.ampPP + d * STEP.amp)); schedulePush([selCh]); }
+    if (b.dataset.p === "phase") { s.phase = ((s.phase + d * STEP.phase) % 360 + 360) % 360; schedulePush([selCh]); }
+    if (b.dataset.p === "cycles") { s.cycles = Math.max(0, s.cycles + d); schedulePush([selCh]); }
     loadInputs();
   });
 });
