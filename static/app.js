@@ -54,8 +54,8 @@ for (const s of SERIES) {
 // ---- 배지 ----
 const BADGE_CLASS = {
   connected: "ok", open: "ok",
-  busy: "warn",
-  error: "err",
+  busy: "warn", idle: "warn", no_pong: "warn",
+  error: "err", fail: "err",
   absent: "", disconnected: "", unknown: "",
 };
 function setBadge(id, state, sub, title) {
@@ -64,20 +64,43 @@ function setBadge(id, state, sub, title) {
   el.querySelector(".sub").textContent = sub || "—";
   el.title = title || "";
 }
-function renderBadges(badges, fwInfo) {
+function agoText(ts) {
+  const sec = Math.max(0, Date.now() / 1000 + serverOffset - ts);
+  if (sec < 5) return "방금";
+  if (sec < 60) return Math.round(sec) + "초 전";
+  if (sec < 3600) return Math.round(sec / 60) + "분 전";
+  return Math.round(sec / 3600) + "시간 전";
+}
+function renderBadges(badges, fwInfo, selftest) {
   const j = badges.jlink;
   setBadge("b-jlink", j.state,
     j.state === "connected" ? "S/N " + j.serials.join(",") :
     j.state === "error" ? "오류" : "미연결", j.detail);
   const c = badges.console;
   setBadge("b-console", c.state,
-    c.port ? c.port + (c.state === "busy" ? " 점유됨" : c.state === "open" ? "" : " 끊김") : "없음",
+    !c.port ? "없음" :
+    c.state === "busy" ? c.port + " 점유됨" :
+    c.state === "idle" ? c.port + " 무수신" :
+    c.state === "open" ? c.port + (c.last_rx ? " · " + agoText(c.last_rx) : "") :
+    c.port + " 끊김",
     c.detail);
   document.getElementById("console-port").textContent = c.port ? "(" + c.port + ")" : "";
   const d = badges.dice;
   setBadge("b-dice", d.state,
     d.port ? d.port + (d.state === "busy" ? " 점유됨" : d.state === "open" ? "" : " 끊김") : "없음",
     d.detail);
+  const m = badges.mcu || { state: "unknown" };
+  setBadge("b-mcu", m.state,
+    m.state === "connected" ? "PING OK" :
+    m.state === "no_pong" ? "응답 없음" : "—", m.detail);
+  // 자가진단(SELFTEST) — LCD 상태 화면과 동일 소스. bit=1 정상.
+  for (const [id, key, name] of [["b-dac", "dac", "AD9106"], ["b-adc", "adc", "ADS131"]]) {
+    if (!selftest) setBadge(id, "unknown", "—", "자가진단 결과 없음 (DICE 연결 시 자동 실행)");
+    else if (selftest.error) setBadge(id, "busy", "진단 실패", "SELFTEST 응답: " + selftest.error);
+    else setBadge(id, selftest[key] ? "connected" : "fail",
+                  selftest[key] ? "정상" : "FAIL",
+                  name + " SPI 프로브 " + (selftest[key] ? "정상" : "실패"));
+  }
   setBadge("b-fw", fwInfo ? "connected" : "unknown",
     fwInfo ? "v" + fwInfo.fw + " (proto " + fwInfo.proto + ")" : "—");
 }
@@ -547,7 +570,7 @@ function connect() {
       lastStatus = null;
       if (m.version) document.getElementById("dash-ver").textContent = m.version;
     }
-    renderBadges(m.badges, m.fw_info);
+    renderBadges(m.badges, m.fw_info, m.selftest);
     renderFwUpdate(m.fw_update);
     addConsoleLines(m.console || []);
     addEvents(m.events || []);

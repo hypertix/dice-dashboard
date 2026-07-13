@@ -34,7 +34,9 @@ run.bat            ← 실행. 브라우저에서 http://localhost:8765
 
 ## 화면 구성
 
-- **연결 배지**: J-Link 프로브 / UART 콘솔(MCU-Link VCOM) / DICE USB CDC / 펌웨어 버전
+- **연결 배지**: J-Link 프로브 / UART 콘솔(MCU-Link VCOM) / DICE USB CDC /
+  MCU(PING 하트비트) / AD9106·ADC(SELFTEST 자가진단, LCD 상태 화면과 동일 소스) / 펌웨어 버전.
+  UART 콘솔은 포트가 열려도 수신 데이터가 없으면 노랑("무수신") — 초록은 실제 수신 중일 때만.
 - **채널 전류 차트**: STATUS 10 Hz 실시간 (CH1 노랑·CH2 초록·CH3 파랑·CH4 빨강)
 - **출력 제어 — dice_lcd 출력제어 화면 복제**: LCD 실물과 동일한 조작
   (CH1~4 탭, 사인 파형, 주파수/진폭(P-P)/위상/버스트 +− 스테퍼, 파형 미리보기(설정값 시뮬레이션),

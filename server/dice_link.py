@@ -14,9 +14,9 @@ import time
 import serial
 
 from . import ports
-from .dice_protocol import (CMD_GET_INFO, CMD_NAME, CMD_PING, FrameParser,
-                            RSP_NAME, TYPE_EVENT, TYPE_RSP, TYPE_STATUS,
-                            encode_cmd, parse_event, parse_status)
+from .dice_protocol import (CMD_GET_INFO, CMD_NAME, CMD_PING, CMD_SELFTEST,
+                            FrameParser, RSP_NAME, TYPE_EVENT, TYPE_RSP,
+                            TYPE_STATUS, encode_cmd, parse_event, parse_status)
 from .state import AppState
 
 
@@ -27,6 +27,7 @@ class DiceLink:
         self.ser = None
         self.seq = 0
         self.lock = threading.Lock()   # 송신 직렬화 (추후 제어 API 대비)
+        self.last_pong = 0.0           # 마지막 PING OK 수신 시각 → MCU 배지
 
     def send(self, cmd_id: int, args: bytes = b"") -> bool:
         with self.lock:
@@ -53,7 +54,22 @@ class DiceLink:
         elif typ == TYPE_RSP and len(pl) >= 2:
             cmd, status = pl[0], pl[1]
             if cmd == CMD_PING and status == 0:
-                return                                    # PING OK 는 조용히
+                self.last_pong = time.time()              # MCU 생존 신호
+                return
+            if cmd == CMD_SELFTEST:
+                if status == 0 and len(pl) >= 4:
+                    mask = pl[2] | (pl[3] << 8)           # bit=1 정상 (계약 7.1절)
+                    st = {"dac": bool(mask & 1), "adc": bool(mask & 2), "raw": mask}
+                    self.state.set_selftest(st)
+                    self.state.add_event(
+                        "dice", "info" if mask & 3 == 3 else "error",
+                        f"자가진단: AD9106(DAC) {'OK' if st['dac'] else 'FAIL'}, "
+                        f"ADS131(ADC) {'OK' if st['adc'] else 'FAIL'}")
+                else:
+                    self.state.set_selftest({"error": RSP_NAME.get(status, status)})
+                    self.state.add_event("dice", "warn",
+                                         f"자가진단 실패: {RSP_NAME.get(status, status)}")
+                return
             if cmd == CMD_GET_INFO and status == 0 and len(pl) >= 7:
                 info = {"fw": f"{pl[2]}.{pl[3]}.{pl[4]}", "hw": pl[5], "proto": pl[6]}
                 self.state.set_fw_info(info)
@@ -71,6 +87,7 @@ class DiceLink:
             if not port:
                 self.state.set_badge("dice", state="absent", port=None,
                                      detail="DICE USB CDC 없음 (미연결 또는 LCD 가 소유)")
+                self.state.set_badge("mcu", state="absent", detail="DICE USB CDC 미연결")
                 time.sleep(3)
                 continue
             try:
@@ -87,7 +104,10 @@ class DiceLink:
             self.state.set_badge("dice", state="open", port=port, detail="")
             parser = FrameParser()
             self.send(CMD_GET_INFO)
+            self.send(CMD_SELFTEST)                       # LCD 상태 화면과 동일 진단
+            self.last_pong = 0.0
             last_ping = 0.0
+            last_mcu = 0.0
             try:
                 while True:
                     now = time.time()
@@ -95,6 +115,14 @@ class DiceLink:
                         last_ping = now
                         if not self.send(CMD_PING):
                             raise serial.SerialException("write fail")
+                    if now - last_mcu >= 1.0:             # MCU 배지 (PONG 신선도)
+                        last_mcu = now
+                        if now - self.last_pong < 2.0:
+                            self.state.set_badge("mcu", state="connected",
+                                                 detail="PING 하트비트 응답 정상")
+                        else:
+                            self.state.set_badge("mcu", state="no_pong",
+                                                 detail="PING 응답 없음 — 펌웨어 미응답")
                     data = self.ser.read(4096)
                     for typ, seq, pl in parser.feed(data):
                         self._on_frame(typ, seq, pl)
@@ -102,6 +130,8 @@ class DiceLink:
             except serial.SerialException:
                 self.state.set_badge("dice", state="disconnected", port=port,
                                      detail="포트 끊김 — 재시도")
+                self.state.set_badge("mcu", state="absent", detail="DICE USB CDC 끊김")
+                self.state.set_selftest(None)
                 try:
                     self.ser.close()
                 except Exception:

@@ -43,12 +43,21 @@ def start(state: AppState, cfg: dict) -> threading.Thread:
                 time.sleep(3)
                 continue
 
-            state.set_badge("console", state="open", port=port, detail="")
+            # 포트 열림 = MCU-Link 프로브가 PC 에 있다는 뜻일 뿐, 보드 UART 가
+            # 살아있다는 보장이 아니다 → 데이터를 받기 전까지는 "무수신"(노랑).
+            state.set_badge("console", state="idle", port=port, last_rx=None,
+                            detail="포트 열림 — 수신 데이터 없음 (보드 전원/UART 배선 확인)")
             buf.clear()
+            last_rx_badge = 0.0
             try:
                 while True:
                     data = ser.read(1024)
                     if data:
+                        now = time.time()
+                        if now - last_rx_badge >= 1.0:    # 배지 갱신은 1초 스로틀
+                            last_rx_badge = now
+                            state.set_badge("console", state="open", port=port,
+                                            last_rx=now, detail="")
                         buf += data
                         while b"\n" in buf:
                             line, _, rest = bytes(buf).partition(b"\n")

@@ -28,6 +28,7 @@ CMD_NAME = {
 
 CMD_PING = 0x01
 CMD_GET_INFO = 0x02
+CMD_SELFTEST = 0x40
 
 
 def crc16_ccitt(data: bytes) -> int:

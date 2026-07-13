@@ -27,8 +27,10 @@ class AppState:
             "jlink":   {"state": "unknown", "serials": [], "ts": 0},
             "console": {"state": "unknown", "port": None, "ts": 0},
             "dice":    {"state": "unknown", "port": None, "ts": 0},
+            "mcu":     {"state": "unknown", "ts": 0},   # PING 하트비트 응답 기반
         }
         self.fw_info = None                   # GET_INFO 응답 {fw, hw, proto}
+        self.selftest = None                  # SELFTEST 응답 {dac, adc, raw} — LCD 상태 화면과 동일 소스
         self.ports = []                       # 마지막 COM 스캔 결과
         self.version = "dev"                  # 대시보드 버전 (git describe)
         self.fw_update = {"phase": "idle", "detail": ""}   # OTA 플래시 진행 상태
@@ -77,6 +79,10 @@ class AppState:
         with self.lock:
             self.fw_info = info
 
+    def set_selftest(self, st) -> None:
+        with self.lock:
+            self.selftest = st
+
     def set_ports(self, ports: list) -> None:
         with self.lock:
             self.ports = ports
@@ -96,6 +102,7 @@ class AppState:
                 "version": self.version,
                 "badges": {k: dict(v) for k, v in self.badges.items()},
                 "fw_info": self.fw_info,
+                "selftest": dict(self.selftest) if self.selftest else None,
                 "fw_update": dict(self.fw_update),
                 "ports": list(self.ports),
                 "last_status": {"ts": last_status[1], **last_status[2]} if last_status else None,
@@ -115,6 +122,7 @@ class AppState:
                 "now": time.time(),
                 "badges": {k: dict(v) for k, v in self.badges.items()},
                 "fw_info": self.fw_info,
+                "selftest": dict(self.selftest) if self.selftest else None,
                 "fw_update": dict(self.fw_update),
                 "console": [{"seq": s, "ts": t, "line": l}
                             for s, t, l in self.console if s > cursor],
