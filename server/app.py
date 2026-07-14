@@ -58,14 +58,15 @@ def load_config() -> dict:
 cfg = load_config()
 state = AppState(os.path.join(APP_DIR, "logs"))
 link = None                      # DiceLink — lifespan 에서 생성
+console_ctl = None               # 콘솔 포트 선택 컨트롤러 — lifespan 에서 생성
 
 
 @asynccontextmanager
 async def lifespan(_app):
-    global link
+    global link, console_ctl
     state.version = self_update.current_version()
     jlink_watch.start(state, cfg)
-    console_tail.start(state, cfg)
+    console_ctl = console_tail.start(state, cfg)
     link = dice_link.start(state, cfg)
     state.add_event("dashboard", "info", f"대시보드 시작 (버전 {state.version})")
     if WINDOWLESS:                   # 창 없는 실행: 서버 수명 = 브라우저 탭
@@ -213,12 +214,29 @@ async def api_update_apply():
     return await asyncio.to_thread(self_update.apply, state, cfg)
 
 
+class ConsoleSelIn(BaseModel):
+    port: str = ""               # "" = 자동 감지로 복귀
+
+
+@app.post("/api/console/select")
+async def api_console_select(sel: ConsoleSelIn):
+    """UART 콘솔 COM 포트 수동 선택 (배지 드롭다운)."""
+    if console_ctl is None:
+        return JSONResponse({"ok": False, "error": "초기화 중"}, status_code=503)
+    port = sel.port.strip()
+    console_ctl.select(port or None)
+    state.add_event("console", "info", f"콘솔 포트 선택: {port or '자동 감지'}")
+    return {"ok": True}
+
+
 @app.websocket("/ws")
 async def ws(sock: WebSocket):
     global _ws_clients, _had_client
     await sock.accept()
     _ws_clients += 1
     _had_client = True
+    if console_ctl:              # 새로고침 = 무수신 상태면 콘솔 포트 재스캔
+        console_ctl.rescan()
     try:
         snap = state.snapshot()
         await sock.send_text(json.dumps({"t": "snap", **snap}, ensure_ascii=False))

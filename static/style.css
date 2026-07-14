@@ -52,6 +52,9 @@ nav#badges { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 16px; }
 .badge.err .dot  { background: var(--critical); }
 .badge .label { color: var(--ink-2); font-weight: 600; }
 .badge .sub { color: var(--muted); font-variant-numeric: tabular-nums; }
+/* 콘솔 배지 = 클릭하면 COM 포트 드롭다운 (투명 select 를 배지 전체에 겹침) */
+#b-console { position: relative; cursor: pointer; }
+#console-select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 
 main {
   flex: 1; min-height: 0;

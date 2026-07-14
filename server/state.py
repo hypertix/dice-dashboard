@@ -124,6 +124,7 @@ class AppState:
                 "fw_info": self.fw_info,
                 "selftest": dict(self.selftest) if self.selftest else None,
                 "fw_update": dict(self.fw_update),
+                "ports": list(self.ports),
                 "console": [{"seq": s, "ts": t, "line": l}
                             for s, t, l in self.console if s > cursor],
                 "events": [{"seq": s, "ts": t, "source": src, "level": lv, "msg": m}

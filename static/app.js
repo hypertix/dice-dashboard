@@ -77,12 +77,13 @@ function renderBadges(badges, fwInfo, selftest) {
     j.state === "connected" ? "S/N " + j.serials.join(",") :
     j.state === "error" ? "오류" : "미연결", j.detail);
   const c = badges.console;
+  const cm = c.manual ? " 수동" : "";
   setBadge("b-console", c.state,
-    !c.port ? "없음" :
-    c.state === "busy" ? c.port + " 점유됨" :
-    c.state === "idle" ? c.port + " 무수신" :
-    c.state === "open" ? c.port + (c.last_rx ? " · " + agoText(c.last_rx) : "") :
-    c.port + " 끊김",
+    (!c.port ? "없음" :
+     c.state === "busy" ? c.port + " 점유됨" :
+     c.state === "idle" ? c.port + " 무수신" :
+     c.state === "open" ? c.port + (c.last_rx ? " · " + agoText(c.last_rx) : "") :
+     c.port + " 끊김") + cm,
     c.detail);
   document.getElementById("console-port").textContent = c.port ? "(" + c.port + ")" : "";
   const d = badges.dice;
@@ -104,6 +105,32 @@ function renderBadges(badges, fwInfo, selftest) {
   setBadge("b-fw", fwInfo ? "connected" : "unknown",
     fwInfo ? "v" + fwInfo.fw + " (proto " + fwInfo.proto + ")" : "—");
 }
+
+// ---- 콘솔 포트 수동 선택 (배지 클릭 → 드롭다운, 빈 값 = 자동 감지) ----
+const consoleSel = document.getElementById("console-select");
+let portsSig = "";
+function renderPortOptions(plist, manual) {
+  if (!plist) return;
+  const sig = JSON.stringify([plist.map(p => p.device), manual || ""]);
+  if (sig === portsSig || document.activeElement === consoleSel) return;
+  portsSig = sig;
+  consoleSel.innerHTML = "";
+  const auto = document.createElement("option");
+  auto.value = "";
+  auto.textContent = "자동 감지 (SEGGER VID)";
+  consoleSel.appendChild(auto);
+  for (const p of plist) {
+    const o = document.createElement("option");
+    o.value = p.device;
+    o.textContent = `${p.device} — ${p.desc || ""}`;
+    consoleSel.appendChild(o);
+  }
+  consoleSel.value = manual || "";
+}
+consoleSel.addEventListener("change", async () => {
+  const r = await api("/api/console/select", { port: consoleSel.value });
+  if (!r.ok) alert(r.error || "콘솔 포트 선택 실패");
+});
 
 // ---- 스탯 타일 ----
 function renderTiles() {
@@ -591,6 +618,7 @@ function connect() {
       if (m.version) document.getElementById("dash-ver").textContent = m.version;
     }
     renderBadges(m.badges, m.fw_info, m.selftest);
+    renderPortOptions(m.ports, m.badges.console && m.badges.console.manual);
     renderFwUpdate(m.fw_update);
     addConsoleLines(m.console || []);
     addEvents(m.events || []);
