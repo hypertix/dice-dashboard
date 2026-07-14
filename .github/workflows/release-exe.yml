@@ -31,7 +31,7 @@ jobs:
       - name: 기동 스모크 테스트 (/api/state 응답 확인)
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath "dist\DiceDashboard.exe" -PassThru
+          $p = Start-Process -FilePath "dist\DiceDashboard.exe" -ArgumentList "--no-browser" -PassThru
           $ok = $false
           foreach ($i in 1..30) {
             Start-Sleep -Seconds 1
@@ -40,7 +40,8 @@ jobs:
               if ($r.version) { $ok = $true; Write-Host "version: $($r.version)"; break }
             } catch {}
           }
-          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          # onefile 은 부트로더+본체 2개 프로세스 — 이름으로 전부 종료
+          Get-Process DiceDashboard -ErrorAction SilentlyContinue | Stop-Process -Force
           if (-not $ok) { throw "exe smoke test failed: /api/state no response" }
 
       - name: Release 생성 + exe 첨부

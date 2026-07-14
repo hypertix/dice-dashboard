@@ -14,7 +14,13 @@ DICE(RW612 펌웨어) 벤치/검증용 **로컬 웹 대시보드**. 브라우저
 1. **J-Link Software** 설치 — [segger.com](https://www.segger.com/downloads/jlink/) (펌웨어 플래시용, 최초 1회)
 2. [**Releases**](https://github.com/hypertix/dice-dashboard/releases/latest) 에서
    `DiceDashboard.exe` 다운로드 → 적당한 폴더에 두고 **더블클릭**
-3. 브라우저에서 http://localhost:8765 접속
+3. 브라우저가 자동으로 열린다 (수동 접속: http://localhost:8765)
+
+창 없이 백그라운드로 실행되고, **수명은 브라우저 탭에 묶인다** —
+실행하면 브라우저가 자동으로 열리고, 마지막 대시보드 탭을 닫으면 서버도
+몇 초 뒤 자동 종료된다 (새로고침은 종료로 오인하지 않음).
+이미 켜진 상태에서 exe 를 또 실행하면 브라우저 탭만 다시 열린다.
+서버 내부 오류는 exe 옆 `logs/server.log` 에 남는다.
 
 Python·Git 설치 불필요. 처음 실행 시 Windows SmartScreen 경고가 뜨면
 **"추가 정보" → "실행"** (서명 없는 사내 배포 exe 라 뜨는 정상 경고).

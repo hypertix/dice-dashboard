@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 # 단일 exe 빌드:  pyinstaller --clean --noconfirm DiceDashboard.spec
-# 산출물:         dist/DiceDashboard.exe  (static/ 내장, 콘솔 창 표시)
+# 산출물:         dist/DiceDashboard.exe — 창 없는 백그라운드 실행,
+#                 시작 시 브라우저 자동 오픈, 종료는 대시보드 「서버 종료」 버튼
 from PyInstaller.utils.hooks import collect_submodules
 
 a = Analysis(
@@ -24,6 +25,6 @@ exe = EXE(
     a.binaries,
     a.datas,
     name="DiceDashboard",
-    console=True,
+    console=False,
     upx=False,
 )

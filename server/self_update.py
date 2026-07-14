@@ -35,7 +35,7 @@ ping -n 2 127.0.0.1 >nul
 del "%EXE%" >nul 2>&1
 if exist "%EXE%" goto wait
 move /y "%NEW%" "%EXE%" >nul
-start "" "%EXE%"
+start "" "%EXE%" --no-browser
 del "%~f0"
 """
 
