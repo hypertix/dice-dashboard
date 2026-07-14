@@ -10,6 +10,9 @@ import os
 import sys
 
 FROZEN = bool(getattr(sys, "frozen", False))
+# 창 없는 실행 = exe(windowed) 또는 pythonw/숨김 실행 → 브라우저 자동 오픈,
+# 마지막 탭 닫으면 자동 종료, 로그는 logs/server.log
+WINDOWLESS = FROZEN or sys.stdout is None
 
 if FROZEN:
     RES_DIR = sys._MEIPASS

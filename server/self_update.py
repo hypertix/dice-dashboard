@@ -17,7 +17,7 @@ import urllib.error
 import urllib.request
 
 from . import fw_update
-from .paths import APP_DIR, FROZEN
+from .paths import APP_DIR, FROZEN, WINDOWLESS
 from .version import __version__
 
 RESTART_EXIT_CODE = 3            # run.bat 이 이 코드를 보면 재시작 루프를 돈다
@@ -82,7 +82,19 @@ def _apply_git(state) -> dict:
                     os.path.join(APP_DIR, "requirements.txt")],
                    capture_output=True, timeout=300)
     state.add_event("dashboard", "info", "대시보드 업데이트 적용 — 3초 후 재시작")
-    threading.Timer(3.0, lambda: os._exit(RESTART_EXIT_CODE)).start()
+    if WINDOWLESS:
+        # pythonw 숨김 실행에는 run.bat 재시작 루프가 없다 — 포트가 풀린 뒤(3초)
+        # 스스로 재실행하는 배치를 띄우고 종료한다 (exe 교체 배치와 같은 패턴).
+        bat = os.path.join(APP_DIR, "_dice_restart.bat")
+        with open(bat, "w", encoding="ascii") as f:
+            f.write("@echo off\nping -n 4 127.0.0.1 >nul\n"
+                    f'start "" "{sys.executable}" -m server.app --no-browser\n'
+                    'del "%~f0"\n')
+        subprocess.Popen(["cmd", "/c", bat], cwd=APP_DIR,
+                         creationflags=subprocess.CREATE_NO_WINDOW, close_fds=True)
+        threading.Timer(1.0, lambda: os._exit(0)).start()
+    else:
+        threading.Timer(3.0, lambda: os._exit(RESTART_EXIT_CODE)).start()
     return {"ok": True, "restarting": True}
 
 

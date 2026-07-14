@@ -27,7 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import console_tail, dice_link, fw_update, jlink_watch, self_update
-from .paths import APP_DIR, FROZEN, RES_DIR
+from .paths import APP_DIR, RES_DIR, WINDOWLESS
 from .state import AppState
 
 CONFIG_PATH = os.path.join(APP_DIR, "config.json")
@@ -68,7 +68,7 @@ async def lifespan(_app):
     console_tail.start(state, cfg)
     link = dice_link.start(state, cfg)
     state.add_event("dashboard", "info", f"대시보드 시작 (버전 {state.version})")
-    if FROZEN:                       # 창 없는 exe: 서버 수명 = 브라우저 탭
+    if WINDOWLESS:                   # 창 없는 실행: 서버 수명 = 브라우저 탭
         asyncio.create_task(_auto_exit_watch())
     yield
 
@@ -265,8 +265,8 @@ def main():
     finally:
         probe.close()
 
-    # exe 더블클릭 UX: 서버가 뜨면 브라우저 자동 오픈 (자기 업데이트 재시작은 제외)
-    if FROZEN and "--no-browser" not in sys.argv:
+    # 창 없는 실행 UX: 서버가 뜨면 브라우저 자동 오픈 (재시작/의도적 억제는 제외)
+    if WINDOWLESS and "--no-browser" not in sys.argv:
         threading.Timer(1.5, lambda: webbrowser.open(url)).start()
 
     import uvicorn
