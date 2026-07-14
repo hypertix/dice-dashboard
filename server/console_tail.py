@@ -96,9 +96,17 @@ def start(state: AppState, cfg: dict) -> Ctl:
             last_scan = time.time()
             try:
                 while True:
-                    if ctl.force_gen != f_seen or (ctl.soft_gen != s_seen and not got_data):
-                        idx = 0          # 수동 선택/재스캔 요청 — 포트 다시 잡기
+                    if ctl.force_gen != f_seen:
+                        idx = 0          # 수동 선택 — 즉시 포트 다시 잡기
                         break
+                    if ctl.soft_gen != s_seen and not got_data:
+                        # 새로고침 재스캔: 후보가 지금 포트 하나뿐이면 닫지 않고
+                        # 유지한다 (재오픈 갭 동안의 수신 유실 방지)
+                        s_seen = ctl.soft_gen
+                        c2 = candidates()
+                        if port not in c2 or len(c2) > 1:
+                            idx = 0
+                            break
                     data = ser.read(1024)
                     if data:
                         got_data = True
