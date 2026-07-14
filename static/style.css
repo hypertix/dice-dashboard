@@ -123,6 +123,7 @@ main {
   position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
   color: var(--muted);
 }
+.empty[hidden] { display: none; }   /* hidden 속성이 display:flex 에 지지 않도록 */
 
 /* 콘솔 */
 .console {
@@ -205,13 +206,6 @@ main {
 @keyframes blink { 50% { opacity: 0.2; } }
 
 .lcdui-panel { background: var(--lpanel); border-radius: 12px; padding: 12px 14px; }
-.lcdui-waves { display: flex; gap: 10px; margin: 8px 0 12px; }
-.lcdui-waves button {
-  min-width: 76px; padding: 9px 0; font: inherit; font-size: 15px; font-weight: 600;
-  background: var(--ldeep); color: #e8ecf5;
-  border: 1px solid var(--lborder); border-radius: 9px; cursor: pointer;
-}
-.lcdui-waves button.sel { background: var(--lblue); border-color: var(--lblue); color: #fff; }
 
 .lcdui-params { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .lcdui-params .p { display: flex; flex-direction: column; gap: 7px; }

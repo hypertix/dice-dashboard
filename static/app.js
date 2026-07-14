@@ -297,8 +297,7 @@ canvas.addEventListener("mouseleave", () => { hoverX = null; tooltip.hidden = tr
 setInterval(drawChart, 200);
 window.addEventListener("resize", () => { drawChart(); drawPreview(); });
 
-// ==== 출력 제어 — dice_lcd 출력제어 화면 복제 ====
-const WAVES = ["사인"];
+// ==== 출력 제어 — dice_lcd 출력제어 화면 복제 (파형은 사인 고정, type=0) ====
 // 채널별 설정 (LCD 기본값과 동일: 사인 1 kHz, 50 mA P-P, 0°, 연속)
 const chSettings = [0, 1, 2, 3].map(() => ({ type: 0, freq: 1000, ampPP: 50, phase: 0, cycles: 0 }));
 let selCh = 0;
@@ -311,17 +310,6 @@ for (let i = 0; i < 4; i++) {
   b.addEventListener("click", () => { saveInputs(); selCh = i; loadInputs(); });
   chtabsEl.appendChild(b);
 }
-const wavesEl = document.getElementById("waves");
-WAVES.forEach((name, t) => {
-  const b = document.createElement("button");
-  b.textContent = name;
-  b.addEventListener("click", () => {
-    chSettings[selCh].type = t;
-    renderLcdSel();
-    drawPreview();
-  });
-  wavesEl.appendChild(b);
-});
 
 const inFreq = document.getElementById("p-freq");
 const inAmp = document.getElementById("p-amp");
@@ -397,7 +385,6 @@ document.querySelectorAll(".lcdui-params .step button").forEach(b => {
 
 function renderLcdSel() {
   [...chtabsEl.children].forEach((b, i) => b.classList.toggle("sel", i === selCh));
-  [...wavesEl.children].forEach((b, t) => b.classList.toggle("sel", t === chSettings[selCh].type));
 }
 function renderLcdRunState() {
   const run = lastStatus ? lastStatus.run : 0;
